@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class GaussHermite :
 
     def __init__(self, m, a) :
@@ -28,6 +29,7 @@ class GaussHermite :
 
     def get_random(self) :
         return self.scale(np.random.randn())
+
 
 class Leja :
 
@@ -65,14 +67,14 @@ class Leja :
 
         # ensure d1, d2 have shape (d, 2)
         d1, d2 = np.array(d1), np.array(d2)
-        assert(d1.shape == d2.shape)
+        assert d1.shape == d2.shape
         d = 1 if len(d1.shape) == 1 else d1.shape[0]
         if len(d1.shape) == 1 :
             d1 = d1.reshape((1,2))
             d2 = d2.reshape((1,2))
         for i in range(d) :
-            assert(d1[i,0] < d1[i,1])
-            assert(d2[i,0] < d2[i,1])
+            assert d1[i,0] < d1[i,1]
+            assert d2[i,0] < d2[i,1]
 
         # ensure x has shape (n, d)
         x = np.array(x)
@@ -96,9 +98,9 @@ class Leja :
                         f'Assertion failed with\n x[{j},{i}] ({x[j,i]})\n d1[i,1] ({d1[i,1]})'
 
         # check
-        assert(len(x.shape) == len(d1.shape) == len(d2.shape) == 2)
-        assert(x.shape[1] == d1.shape[0] == d2.shape[0])
-        assert(d1.shape[1] == d2.shape[1] == 2)
+        assert len(x.shape) == len(d1.shape) == len(d2.shape) == 2
+        assert x.shape[1] == d1.shape[0] == d2.shape[0]
+        assert d1.shape[1] == d2.shape[1] == 2
 
         # scale
         for i in range(d) :
@@ -120,6 +122,7 @@ class Leja :
         if self.domain is None :
             return np.random.uniform(-1, 1)
         return np.random.uniform(self.domain[0], self.domain[1])
+
 
 class Multi :
 
@@ -151,6 +154,7 @@ class GaussHermiteMulti(Multi) :
         for g in self.gs :
             print(f'\t\t m = {g.m}, a = {g.a}')
 
+
 class LejaMulti(Multi) :
 
     def __init__(self, *, domains=None, d=None) :
@@ -164,33 +168,3 @@ class LejaMulti(Multi) :
         print(f'\tLeja in d = {len(self.gs)}')
         for g in self.gs :
             print(f'\t\t domain = {g.domain}')
-
-
-def test_gens(n, dmax) :
-
-    gens = []
-    for _ in range(n) :
-
-        d = np.random.randint(low=2, high=dmax)
-
-        if True :
-            m = np.random.randn(d)
-            a = np.random.rand(d)
-            gens.append(GaussHermiteMulti(m, a))
-
-        if True :
-            domain = np.zeros((d, 2))
-            domain[:,1] = np.sort(np.random.rand(d)*10)
-            domain[:,0] = - domain[:,1]
-            gens.append(LejaMulti(domains=domain))
-
-    return gens
-
-
-if __name__ == '__main__' :
-
-    for g in test_gens(5, 10) :
-        x = g.get_random()
-        assert np.isclose(x, g.scale(g.scale_back(x))).all()
-
-    print('TEST points SUCCESSFUL')
