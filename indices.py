@@ -61,8 +61,8 @@ def abs_e_sparse(k, l, i=0, e=None, *, nu=None, cutoff=None) :
     return r
 
 
-def smolyak_coefficient_zeta_sparse(k, l, *, nu=None) :
-    return np.sum([(-1)**e for e in abs_e_sparse(lambda j : k[j], l, nu=nu, cutoff=len(k))])
+def smolyak_coefficient_zeta_sparse(k, l, *, nu=None, cutoff=None) :
+    return np.sum([(-1)**e for e in abs_e_sparse(k, l, nu=nu, cutoff=cutoff)])
 
 
 def sparse_index_to_dense(nu, cutoff=None) :

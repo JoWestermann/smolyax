@@ -60,6 +60,6 @@ def test_smolyak_coefficients() :
 
         for nu_1, nu_2 in zip(isparse, idense):
             c_1 = smolyak_coefficient_zeta_sparse(k, l, nu=nu_1)
-            c_2 = smolyak_coefficient_zeta_dense(k, l, nu=nu_2)
+            c_2 = smolyak_coefficient_zeta_dense(lambda j : k[j], l, nu=nu_2)
             assert c_1 == c_2
 
