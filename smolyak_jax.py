@@ -1,18 +1,17 @@
-import sys, copy
+import copy
 import numpy as np
 import jax
 import jax.numpy as jnp
 import itertools as it
 
-sys.path.append('../')
-from interpolation import indices
+import indices
 
 jax.config.update("jax_enable_x64", True)
 
 np.seterr(divide='raise')
 
 
-def evaluate_jax(x, F, n_list, w_list, j_list) :
+def evaluate_tensorproduct_interpolant(x, F, n_list, w_list, j_list) :
     norm = jnp.ones(x.shape[0])
     for i, j in enumerate(j_list):
         b = x[:, [j]] - n_list[i]
@@ -34,12 +33,12 @@ def evaluate_jax(x, F, n_list, w_list, j_list) :
     return F / norm[:, None]
 
 
-def create_evaluate_for_vmap(shape) :
+def create_evaluate_tensorproduct_interpolant_for_vmap(shape) :
     def wrapped_function(x, F, *args) :
         m_list = args[:len(shape)]
         w_list = args[len(shape):2 * len(shape)]
         j_list = args[2 * len(shape)]
-        return evaluate_jax(x, F, m_list, w_list, j_list)
+        return evaluate_tensorproduct_interpolant(x, F, m_list, w_list, j_list)
     return jax.jit(wrapped_function)
 
 
@@ -50,69 +49,68 @@ class MultivariateSmolyakBarycentricInterpolator :
         self.is_nested = g.is_nested
 
         # Compute coefficients and multi-indices of the Smolyak Operator
-        coeffs = []
-        indxs = []
+        zetas = []
         indxs_all = indices.indexset_sparse(lambda j : k[j], l, cutoff=self.d)
+        indxs_zeta = []
         for idx in indxs_all :
-            c = np.sum([(-1)**e for e in indices.abs_e_sparse(lambda j : k[j], l, nu=idx, cutoff=self.d)])
-            if c != 0 :
-                coeffs.append(c)
-                indxs.append(idx)
+            zeta = indices.smolyak_coefficient_zeta_sparse(lambda j : k[j], l, nu=idx, cutoff=self.d)
+            if zeta != 0 :
+                zetas.append(zeta)
+                indxs_zeta.append(idx)
 
         # Compute base shapes for which `evaluate` will be compiled and sort coeffs and idxs accordingly
-        self.l2_shape = {}
-        self.l2_indxs = {}
-        self.l2_coeffs = {}
-        for c, idx in zip(coeffs, indxs) :
-            shape = tuple(sorted(idx.values(), reverse=True))
-            length = len(shape)
-            self.l2_shape[length] = tuple(max(nu1, nu2) for nu1, nu2 in zip(self.l2_shape.get(length, shape), shape))
-            self.l2_indxs[length] = self.l2_indxs.get(length, []) + [idx]
-            self.l2_coeffs[length] = self.l2_coeffs.get(length, []) + [c]
+        self.k_2_tau = {}
+        self.k_2_lambda_k = {}
+        self.k_2_zetas = {}
+        for zeta, nu in zip(zetas, indxs_zeta) :
+            tau = tuple(sorted(nu.values(), reverse=True))
+            kk = len(tau)
+            self.k_2_tau[kk] = tuple(max(nu1, nu2) for nu1, nu2 in zip(self.k_2_tau.get(kk, tau), tau))
+            self.k_2_lambda_k[kk] = self.k_2_lambda_k.get(kk, []) + [nu]
+            self.k_2_zetas[kk] = self.k_2_zetas.get(kk, []) + [zeta]
 
         # Allocate and prefill data
         self.data = {}
         self.compiledfuncs = {}
         self.offset = 0
-        for l in self.l2_shape.keys() :
-            if l == 0 :
-                self.offset = self.l2_coeffs[l]
+        for k in self.k_2_tau.keys() :
+            if k == 0 :
+                self.offset = self.k_2_zetas[k]
                 continue
-            n = len(self.l2_coeffs[l]) # number of shapes with length l
-            s = self.l2_shape[l] # max shape
+            n = len(self.k_2_zetas[k])  # number of shapes with length k
+            s = self.k_2_tau[k]  # max shape
 
-            if l not in self.data : self.data[l] = {}
-            self.data[l]['c'] = jnp.array(self.l2_coeffs[l])
-            self.data[l]['F'] = np.zeros((n, rank) + tuple(si+1 for si in s))
+            if k not in self.data : self.data[k] = {}
+            self.data[k]['z'] = jnp.array(self.k_2_zetas[k])
+            self.data[k]['F'] = np.zeros((n, rank) + tuple(si+1 for si in s))
+            self.data[k]['n'] = [np.zeros((n, si+1)) for si in s]
+            self.data[k]['w'] = [np.zeros((n, si+1)) for si in s]
+            self.data[k]['t'] = np.zeros((n, k), dtype=int)
 
-            self.data[l]['n'] = [np.zeros((n, si+1)) for si in s]
-            self.data[l]['w'] = [np.zeros((n, si+1)) for si in s]
-            self.data[l]['j'] = np.zeros((n, l), dtype=int)
-
-            for i, idx in enumerate(self.l2_indxs[l]) :
+            for i, idx in enumerate(self.k_2_lambda_k[k]) :
                 adims = list(idx.keys())  # active dimensions
-                ordering = sorted(range(l), key=lambda i: list(idx.values())[i], reverse=True)
+                ordering = sorted(range(k), key=lambda i: list(idx.values())[i], reverse=True)
 
-                self.data[l]['j'][i] = [adims[o] for o in ordering]
+                self.data[k]['t'][i] = [adims[o] for o in ordering]
 
-                for k, o in enumerate(ordering) :
+                for t, o in enumerate(ordering) :
                     dim = adims[o]
                     nodes = g[dim](idx[dim])
-                    self.data[l]['n'][k][i][:len(nodes)] = nodes
-                    self.data[l]['w'][k][i][:len(nodes)] = [1/np.prod([nj - nk for nk in nodes if nk != nj]) for nj in nodes]
+                    self.data[k]['n'][t][i][:len(nodes)] = nodes
+                    self.data[k]['w'][t][i][:len(nodes)] = [1/np.prod([nj - nk for nk in nodes if nk != nj]) for nj in nodes]
 
         # Other variables, info, etc
         self.zero = np.squeeze([g[i](0) for i in range(self.d)])
         if self.is_nested :
             self.n = len(indxs_all)
         else :
-            self.n = int(np.sum([np.prod([si+1 for si in idx.values()]) for idx in indxs]))
+            self.n = int(np.sum([np.prod([si+1 for si in idx.values()]) for idx in indxs_zeta]))
         self.n_f_evals = 0
 
         if f is not None :
             self.set_F(f=f, batchsize=batchsize)
 
-    def set_F(self, *, f, F=None, i=None, batchsize=250) :
+    def set_F(self, *, f, F=None, batchsize=250) :
         if F is None : F = {}
 
         # Special case l = 0
@@ -120,7 +118,7 @@ class MultivariateSmolyakBarycentricInterpolator :
         if self.is_nested :
             Fo = F
         else :
-            Fo = F.get(idx, {}) # in this case, idx == degrees
+            Fo = F.get(idx, {})  # in this case, idx == degrees
         if idx not in Fo.keys() :
             Fo[idx] = f(copy.deepcopy(self.zero))
             self.n_f_evals += 1
@@ -130,7 +128,7 @@ class MultivariateSmolyakBarycentricInterpolator :
 
         # l > 0
         for l in self.data.keys() :
-            for i, nu in enumerate(self.l2_indxs[l]) :
+            for i, nu in enumerate(self.k_2_lambda_k[l]) :
                 degrees = indices.sparse_index_to_dense(nu, self.d)
                 x       = copy.deepcopy(self.zero)
 
@@ -140,9 +138,9 @@ class MultivariateSmolyakBarycentricInterpolator :
                     Fo = F.get(degrees, {})
 
                 for idx in it.product(*(range(d+1) for d in degrees)) :
-                    ridx = tuple(idx[j] for j in self.data[l]['j'][i])
+                    ridx = tuple(idx[j] for j in self.data[l]['t'][i])
                     if idx not in Fo.keys() :
-                        for k, (dim, deg) in enumerate(zip(self.data[l]['j'][i], ridx)) :
+                        for k, (dim, deg) in enumerate(zip(self.data[l]['t'][i], ridx)) :
                             x[dim] = self.data[l]['n'][k][i][deg]
                         Fo[idx] = f(x)
                         self.n_f_evals += 1
@@ -154,25 +152,27 @@ class MultivariateSmolyakBarycentricInterpolator :
             self.data[l]['F'] = jnp.array(self.data[l]['F'])
             self.data[l]['n'] = [jnp.array(n) for n in self.data[l]['n']]
             self.data[l]['w'] = [jnp.array(n) for n in self.data[l]['w']]
-            self.data[l]['j'] = jnp.array(self.data[l]['j'])
+            self.data[l]['t'] = jnp.array(self.data[l]['t'])
 
         self.compile_for_batchsize(batchsize)
 
         return F
 
     def compile_for_batchsize(self, batchsize) :
-        for l in self.l2_shape.keys() :
-            self.compiledfuncs[l] = jax.vmap(create_evaluate_for_vmap(self.l2_shape[l]),
-                                             in_axes=(None, 0) + (0,) * (2 * l) + (0,))
+        for k in self.k_2_tau.keys() :
+            self.compiledfuncs[k] = jax.vmap(create_evaluate_tensorproduct_interpolant_for_vmap(self.k_2_tau[k]),
+                                             in_axes=(None, 0) + (0,) * (2 * k) + (0,))
         _ = self(np.random.random((batchsize, self.d)))
 
     def __call__(self, x) :
-        r = self.offset
-        for l in self.data.keys() :
-            res = self.compiledfuncs[l](x, self.data[l]['F'], *self.data[l]['n'], *self.data[l]['w'], self.data[l]['j'])
-            r += jnp.tensordot(self.data[l]['c'], res, axes=(0, 0))
+        if x.shape == (self.d,) :
+            x = x[None, :]
+        I_Lambda_x = self.offset
+        for k in self.data.keys() :
+            res = self.compiledfuncs[k](x, self.data[k]['F'], *self.data[k]['n'], *self.data[k]['w'], self.data[k]['t'])
+            I_Lambda_x += jnp.tensordot(self.data[k]['z'], res, axes=(0, 0))
         if len(self.data) == 0  :
-            r = np.broadcast_to(r, (x.shape[0], r.shape[0]))
-        if isinstance(r, np.ndarray) :
-            return r
-        return r.block_until_ready()
+            I_Lambda_x = np.broadcast_to(I_Lambda_x, (x.shape[0], I_Lambda_x.shape[0]))
+        if isinstance(I_Lambda_x, np.ndarray) :
+            return I_Lambda_x
+        return I_Lambda_x.block_until_ready()
