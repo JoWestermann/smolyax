@@ -32,6 +32,7 @@ header-includes:
   - \newcommand{\set}[2]{\{#1\,:\,#2\}}
   - \newcommand{\bsb}{{\pmb{b}}}
   - \newcommand{\bse}{{\pmb{e}}}
+  - \newcommand{\bsk}{{\pmb{k}}}
   - \newcommand{\bsx}{{\pmb{x}}}
   - \newcommand{\bsF}{{\pmb{F}}}
   - \newcommand{\bsT}{{\pmb{T}}}
@@ -88,7 +89,7 @@ and vectors $\bsb^{\nu_j} (x_j) \in \R^{\nu_j+1}$ given as
   j \in \{1, \dots, d\}.
 \end{equation*}
 
-**Smolyak interpolation** [@smolyak:1963; @barthelmann:2000] overcomes the curse-of-dimensionality that characterizes tensor-product interpolation \eqref{eq:ip_tensorproduct}, by introducing polynomial ansatz spaces $\bbP_\Lambda := {\rm span} \set{\bsx^\bsmu}{\bsmu \in \Lambda}$ parametrized by downward closed multi-index sets $\Lambda \subset \N_0^d$. The resulting interpolation operator is then a linear combination of tensorized interpolation operators:
+**Smolyak interpolation** [@smolyak:1963; @barthelmann:2000; @adcock:2022] overcomes the curse-of-dimensionality that characterizes tensor-product interpolation \eqref{eq:ip_tensorproduct}, by introducing polynomial ansatz spaces $\bbP_\Lambda := {\rm span} \set{\bsx^\bsmu}{\bsmu \in \Lambda}$ parametrized by downward closed multi-index sets $\Lambda \subset \N_0^d$. The resulting interpolation operator is then a linear combination of tensorized interpolation operators:
 \begin{equation} \label{eq:ip_smolyak}
     I^\Lambda := \sum \limits_{\bsnu \in \Lambda} \zeta_{\Lambda, \bsnu} I^\bsnu, \qquad \zeta_{\Lambda, \bsnu} := \sum \limits_{\bse \in \{0,1\}^d : \bsnu+\bse \in \Lambda} (-1)^{|\bse|}.
 \end{equation}
@@ -125,6 +126,9 @@ $$p^\bstau(\bsT) \in \R^{\bstau}, \ p^\bstau(\bsT)_{\bsmu} :=
     T_{\bsmu} &\text{ if } \bsmu \le \bsrho\\
     0 &\text{ else.}
 \end{cases} \quad \forall \bsmu \le \bstau.$$
+
+_Example: For $\bsrho = (2,3)$, the tensor $\bsT = \begin{pmatrix} 0 & 3 & -1 \\ 2 & 0 & 4 \end{pmatrix} \in \R^\bsnu$ can be padded to $\bstau = (3,5)$ as $$p^\bstau(\bsT) = \begin{pmatrix} 0 & 3 & -1 & 0 & 0 \\ 2 & 0 & 4 & 0 & 0 \\ 0 & 0 & 0 & 0 & 0\end{pmatrix} \in \R^\bstau.$$_
+
 Any tensorized interpolation operator $I^\bsnu$ can be padded to higher dimensions $\bstau \ge \bsnu$ via
 \begin{equation} \label{eq:ip_padding}
     I^\bsnu [f] (\bsx) \equiv I^{\bsnu, \bstau}[f] (\bsx) :=
@@ -134,23 +138,23 @@ Any tensorized interpolation operator $I^\bsnu$ can be padded to higher dimensio
 
 We write $I^{\bsnu, t, \bstau}$ when applying \eqref{eq:ip_truncating} and \eqref{eq:ip_padding} successively.
 
-**Pseudocode of our implementation strategy. [WIP]**
-We now have all the ingredients in place to implent the Smolyak operator in a highly vectorizable way. Algorithm 1 summarizes the essential steps. Given a downward closed (but otherwise arbitrarily structured) multi-index set $\Lambda$ and the interpolation target $f$, we start with the trivial steps of determining the set $\Lambda_\zeta$ of multi-indices $\bsnu$ with non-zero Smolyak coefficient $\zeta_{\Lambda, \bsnu}$ and the largest number of non-zero multi-index entries $K$. This number typically remains small (single-digit), even when the number of dimensions $d$ is in the hundreds and the cardinality of the multi-index set is in the ten thousands. Now, for each fixed number $k$ of non-zero entries, we determine the set $\Lambda_k$ of all multi-indices with $k$ non-zero entries. For this subset, we determine the
+**Pseudocode of our implementation strategy.**
+We now have everything in place to construct the Smolyak interpolant in a form that is well-suited for vectorized execution. Algorithm \ref{alg:smolyak} outlines the key steps. Given a downward-closed but otherwise arbitrarily structured multi-index set $\Lambda$ and a target function $f$, we begin by identifying the subset $\Lambda_\zeta$ of multi-indices $\bsnu$ with nonzero Smolyak coefficients $\zeta_{\Lambda, \bsnu}$ and determining the maximal number $K$ of nonzero entries across these multi-indices. Notably, $K$ remains small (typically single-digit) even when the dimensionality $d$ reaches the hundreds and $|\Lambda|$ is on the order of tens of thousands. For each fixed sparsity level $k$, we extract the subset $\Lambda_k$ of multi-indices with exactly $k$ nonzero entries and determine the minimal bounding multi-index $\bstau \in \mathbb{N}_0^k$ such that $\bsnu^t \leq \bstau$ for all $\bsnu \in \Lambda_k$. This step ensures that all the tensorized interpolation operators $(I^\bsnu)_{\bsnu \in \Lambda_k}$ can be efficiently assembled into a single, vectorized computation. In Algorithm \ref{alg:smolyak}, this is compactly expressed as the summation of all $(I^{\bsnu, t, \bstau})_{\bsnu \in \Lambda_k}$, but in practice, it corresponds to pre-allocating and incrementally populating large arrays for interpolation nodes, weights, and function values. The final interpolant $I^\Lambda$ is then assembled through a brief loop over a small number of high-throughput operations, ensuring computational efficiency.
 
 \begin{algorithm}[H]
   \caption{Construct the multivariate barycentric Smolyak interpolator $I^\Lambda$\\
     \textit{Input:} Target function $f$, multi-index set $\Lambda \subset \N_0^d$\\
-    \textit{Output:} $I^\Lambda$}
+    \textit{Output:} $I^\Lambda$} \label{alg:smolyak}
   \begin{algorithmic}[1]
     \State $I^\Lambda = 0$
     \State $\Lambda_\zeta = \set{\bsnu \in \Lambda}{\zeta_{\Lambda, \bsnu} \neq 0}$
     \State $K = \max \set{d_\bsnu}{\bsnu \in \Lambda_\zeta}$
     \For{$k \in \{1, \dots, K\}$}
       \State $\Lambda_k = (\bsnu : \bsnu \in \Lambda_\zeta, \ d_\bsnu = k)$
-      \State $\bstau = \max (\set{\bsnu^t}{\bsnu \in \Lambda_k})$
+      \State $\bstau = \left(\max (\set{\nu^t_i}{\bsnu \in \Lambda_k})\right)_{i=1}^k$
       \State $I^{\Lambda, k} = 0$
       \For{$\bsnu \in \Lambda_k$}
-        \State $I^{\Lambda, k} += \zeta_{\Lambda, \bsnu} I^{\bsnu, t, \tau}$
+        \State $I^{\Lambda, k} += \zeta_{\Lambda, \bsnu} I^{\bsnu, t, \bstau}$
       \EndFor
     \State $I^\Lambda += I^{\Lambda, k}$
     \EndFor
@@ -159,16 +163,17 @@ We now have all the ingredients in place to implent the Smolyak operator in a hi
   \end{algorithmic}
 \end{algorithm}
 
-# Scope of jax-smolyak [WIP]
+# Scope of jax-smolyak
 
-The library is able to interpolate any multivariate and vector-valued function $f : \mathbb{R}^{d_1} \to \mathbb{R}^{d_2}$ for any $d_1, d_2 \in \N$. Note that while the above description of the method considered only scalar-valued interpolation targets (i.e. the case $d_2 = 1$), the step towards vector-values targets is trivial as long as all dimensions in the co-domain should be constructed using the same multi-index. But even dimension-specific ansatz spaces are possible with our implementation by stacking multiple interpolators.
+The library provides interpolation capabilities for arbitrary multivariate and vector-valued functions $f : \mathbb{R}^{d_1} \to \mathbb{R}^{d_2}$ for any $d_1, d_2 \in \mathbb{N}$. While the previous discussion focused on scalar-valued interpolation targets (i.e., the case $d_2 = 1$), the extension to vector-valued functions is straightforward and works seamlessly, provided that all interpolants in the codomain are constructed using the same multi-index set $\Lambda$.
 
-The quality of the interpolation will depend on the smoothness of $f$ and the choice of interpolation nodes $\xi$ and multi-index sets $\Lambda$. **[TODO references]**
+The quality of the interpolation depends on the smoothness of $f$ and the choice of interpolation nodes $\xi$ and multi-index sets $\Lambda$. Suitable choices have been extensively studied in the literature (see, e.g., **[TODO:  references]**).
 
-This repository is shipped with ...
+This repository includes generators for Leja and Gauss-Hermite interpolation nodes, as well as multi-index sets of the form
+$$\Lambda_{\bsk, \ell} := \{\bsnu \in \mathbb{N}_0^{d_1} \ : \  \sum_{j=1}^{d_1} k_j \nu_j < \ell\}.$$
+where $\bsk \in \mathbb{R}^{d_1}$ satisfies $k_j \le k_{j+1}$ for all $j=1, \dots, d_1 - 1$. In the special case $\bsk = (1)_{j=1}^{d_1}$, this reduces to the classical total-degree multi-index set.
 
-Further interpolation nodes or multi-index sets can be added easily if necessary, by implementing a minimalistic interface.
-
+Additional interpolation nodes or multi-index sets can be incorporated with minimal effort by implementing a minimalistic interface.
 
 # Acknowledgements
 
