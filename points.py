@@ -134,6 +134,9 @@ class Multi :
     def __getitem__(self, i) :
         return self.gs[i]
 
+    def get_zero(self) :
+        return np.array([g(0)[0] for g in self.gs])
+
     def get_random(self) :
         return np.array([g.get_random() for g in self.gs])
 
@@ -141,7 +144,7 @@ class Multi :
         return np.array([g.scale(xi) for g, xi in zip(self.gs, x)])
 
     def scale_back(self, x) :
-        return [g.scale_back(xi) for g, xi in zip(self.gs, x)]
+        return np.array([g.scale_back(xi) for g, xi in zip(self.gs, x)])
 
 
 class GaussHermiteMulti(Multi) :

@@ -7,17 +7,17 @@ from tensorproduct import TensorProductBarycentricInterpolator
 
 class SmolyakBarycentricInterpolator :
 
-    def __init__(self, gens, k, l, f=None) :
+    def __init__(self, g, k, l, f=None) :
         self.k = k
         self.operators = []
         self.coefficients = []
-        self.is_nested = gens.is_nested
+        self.is_nested = g.is_nested
         kmap = lambda j : k[j]
         i = indices.indexset_sparse(kmap, l, cutoff=len(k))
         for nu in i :
             c = indices.smolyak_coefficient_zeta_sparse(kmap, l, nu=nu, cutoff=len(k))
             if c != 0 :
-                self.operators.append(TensorProductBarycentricInterpolator(gens, nu, len(k)))
+                self.operators.append(TensorProductBarycentricInterpolator(g, nu, len(k)))
                 self.coefficients.append(c)
         if self.is_nested :
             self.n = len(i)

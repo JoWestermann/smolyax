@@ -33,11 +33,11 @@ def evaluate_tensorproduct_interpolant(x, F, n_list, w_list, j_list) :
     return F / norm[:, None]
 
 
-def create_evaluate_tensorproduct_interpolant_for_vmap(shape) :
+def create_evaluate_tensorproduct_interpolant_for_vmap(k) :
     def wrapped_function(x, F, *args) :
-        m_list = args[:len(shape)]
-        w_list = args[len(shape):2 * len(shape)]
-        j_list = args[2 * len(shape)]
+        m_list = args[:k]
+        w_list = args[k:2*k]
+        j_list = args[2*k]
         return evaluate_tensorproduct_interpolant(x, F, m_list, w_list, j_list)
     return jax.jit(wrapped_function)
 
@@ -46,6 +46,7 @@ class MultivariateSmolyakBarycentricInterpolator :
 
     def __init__(self, *, g, k, l, rank, f=None, batchsize=250) :
         self.d = len(k)
+        self.d_out = rank
         self.is_nested = g.is_nested
 
         # Compute coefficients and multi-indices of the Smolyak Operator
@@ -75,7 +76,8 @@ class MultivariateSmolyakBarycentricInterpolator :
         self.offset = 0
         for k in self.k_2_tau.keys() :
             if k == 0 :
-                self.offset = self.k_2_zetas[k]
+                assert len(self.k_2_zetas[k]) == 1
+                self.offset = self.k_2_zetas[k][0]
                 continue
             n = len(self.k_2_zetas[k])  # number of shapes with length k
             s = self.k_2_tau[k]  # max shape
@@ -100,7 +102,7 @@ class MultivariateSmolyakBarycentricInterpolator :
                     self.data[k]['w'][t][i][:len(nodes)] = [1/np.prod([nj - nk for nk in nodes if nk != nj]) for nj in nodes]
 
         # Other variables, info, etc
-        self.zero = np.squeeze([g[i](0) for i in range(self.d)])
+        self.zero = g.get_zero()
         if self.is_nested :
             self.n = len(indxs_all)
         else :
@@ -159,20 +161,19 @@ class MultivariateSmolyakBarycentricInterpolator :
         return F
 
     def compile_for_batchsize(self, batchsize) :
-        for k in self.k_2_tau.keys() :
-            self.compiledfuncs[k] = jax.vmap(create_evaluate_tensorproduct_interpolant_for_vmap(self.k_2_tau[k]),
+        for k in self.data.keys() :
+            self.compiledfuncs[k] = jax.vmap(create_evaluate_tensorproduct_interpolant_for_vmap(k),
                                              in_axes=(None, 0) + (0,) * (2 * k) + (0,))
         _ = self(np.random.random((batchsize, self.d)))
 
     def __call__(self, x) :
+        assert bool(self.compiledfuncs) == bool(self.data), 'The operator has not yet been compiled for a target function.'
         if x.shape == (self.d,) :
             x = x[None, :]
-        I_Lambda_x = self.offset
+        I_Lambda_x = np.broadcast_to(self.offset, (x.shape[0], self.d_out))
         for k in self.data.keys() :
             res = self.compiledfuncs[k](x, self.data[k]['F'], *self.data[k]['n'], *self.data[k]['w'], self.data[k]['t'])
             I_Lambda_x += jnp.tensordot(self.data[k]['z'], res, axes=(0, 0))
-        if len(self.data) == 0  :
-            I_Lambda_x = np.broadcast_to(I_Lambda_x, (x.shape[0], I_Lambda_x.shape[0]))
         if isinstance(I_Lambda_x, np.ndarray) :
             return I_Lambda_x
         return I_Lambda_x.block_until_ready()

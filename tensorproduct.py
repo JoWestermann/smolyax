@@ -19,7 +19,7 @@ class TensorProductBarycentricInterpolator:
         self.nodes   = [gens[i](k) for i, k in degrees.items()]
         self.weights = [np.array([1/np.prod([nj - nk for nk in nodes if nk != nj]) for nj in nodes]) for nodes in self.nodes]
         self.degrees = indices.sparse_index_to_dense(degrees, d)
-        self.x       = np.squeeze(np.array([gens[i](0) for i in range(gens.d)]))
+        self.x       = gens.get_zero()
         # F is the array containing evaluations of the target f
         # NOTE: For efficiency, we index only dimensions that have a degree larger than 0.
         self.ordering = np.argsort([len(nodes) for nodes in self.nodes])[::-1]
