@@ -137,8 +137,9 @@ class Multi :
     def get_zero(self) :
         return np.array([g(0)[0] for g in self.gs])
 
-    def get_random(self) :
-        return np.array([g.get_random() for g in self.gs])
+    def get_random(self, n=0) :
+        if n == 0 : return np.array([g.get_random() for g in self.gs])
+        return np.array([[g.get_random() for g in self.gs] for _ in range(n)])
 
     def scale(self, x) :
         return np.array([g.scale(xi) for g, xi in zip(self.gs, x)])
