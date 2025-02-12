@@ -8,23 +8,15 @@ import indices
 
 jax.config.update("jax_enable_x64", True)
 
-np.seterr(divide='raise')
 
-
-def evaluate_tensorproduct_interpolant(x, F, n_list, w_list, j_list) :
+def evaluate_tensorproduct_interpolant(x, F, n_list, w_list, t_list) :
     norm = jnp.ones(x.shape[0])
-    for i, j in enumerate(j_list):
-        b = x[:, [j]] - n_list[i]
-        try:
-            b = w_list[i] / b
-        # Even though the case that one x coordinate coincides with an interpolation node is valid, we handle it via an
-        # exception since this saves us the expensive and - in the vast majority of cases - unnecessary check.
-        except (ZeroDivisionError, FloatingPointError) :
-            rows_with_zero = jnp.any(b == 0, axis=1)
-            rows_without_zero = jnp.where(~rows_with_zero)[0]
-            rows_with_zero = jnp.where(rows_with_zero)[0]
-            b = b.at[rows_with_zero].set(jnp.where(b[rows_with_zero] == 0, 1., 0.))
-            b = b.at[rows_without_zero].set(w_list[i] / b[rows_without_zero])
+    for i, ti in enumerate(t_list):
+        b = x[:, [ti]] - n_list[i]
+        has_zero = jnp.any(b == 0, axis=1)
+        zero_pattern = jnp.where(b == 0, 1.0, 0.0)
+        normal = w_list[i] / b
+        b = jnp.where(has_zero[:, None], zero_pattern, normal)
         if i == 0:
             F = jnp.einsum(f'ij,kj...->ik...', b, F)
         else:
