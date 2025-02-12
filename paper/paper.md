@@ -55,8 +55,9 @@ header-includes:
 
 We briefly summarize the essentials of high-dimensional interpolation, where sparse grids have become the standard choice for interpolation points. In this setting, the interpolation operator is commonly referred to as the Smolyak operator. This overview provides background and establishes notation, which will be used to describe our specific implementation choices in the next section.
 
-**Univariate interpolation.** Given a domain $D \subset \R$ and set of $\ell \in \N$ pairwise distinct interpolation points $(\xi^\ell_i)_{i=0}^\ell \subset D$, the polynomial interpolation operator $I^\ell : C^0(D) \to \bbP_\ell := {\rm span} \set{x^i}{i=0,\dots,\ell}$ is defined as the mapping of a function $f$ onto the (unique) polynomial $I^\ell [f]$ of maximal degree $\ell$ such that $f(\xi^\ell_i) = I^\ell [f](\xi^\ell_i)$ for all $i\in\{0,1,\dots,\ell\}$.
+**Univariate interpolation.** Given a domain $D \subset \R$ and set of $\ell \in \N$ pairwise distinct interpolation points $(\xi^\ell_i)_{i=0}^\ell \subset D$, the polynomial interpolation operator $I^\ell : C^0(D) \to \bbP_\ell := {\rm span} \set{x^i}{i=0,\dots,\ell}$ is the mapping of a function $f$ onto the unique polynomial $I^\ell [f]$ of maximal degree $\ell$ such that $f(\xi^\ell_i) = I^\ell [f](\xi^\ell_i)$ for all $i\in\{0,1,\dots,\ell\}$.
 
+A classical method for evaluating the interpolating polynomial that is known for numerical stability is barycentric interpolation
 One way to compute the interpolating polynomial that is known for its numerical stability is barycentric interpolation [@berrut:2004]. The univariate barycentric interpolation formula is given as
 \begin{align}
     I^\ell [f] (x) := \frac{\sum_{i=0}^\ell b_i^\ell(x) f(\xi^\ell_i)}{\sum_{i=0}^\ell b_i^\ell(x)},
@@ -66,12 +67,13 @@ One way to compute the interpolating polynomial that is known for its numerical 
     w_i^\ell &:= \prod \limits_{k\in\{0,1,...,\ell\}/\{i\}}\frac{1}{(\xi^\ell_i - \xi^\ell_k)}.
 \end{align}
 
-**Tensorized interpolation.** Let $d\in \N$. Given a tensor-product domain $D = \otimes_{j=1}^d D_1$ with $D_1 \subset \R$ and a multi-index $\bsnu \in \N_0^d$ characterizing the maximal polynomial degree in each dimension, we define $I^\bsnu : C^0(D) \to \bbP_\bsnu := {\rm span} \set{\bsx^\bsmu}{\bsmu \leq \bsnu}$ as
+**Tensorized interpolation** generalizes univariate interpolation to multivariate functions defined on a tensor-product domain $D = \otimes_{j=1}^d D_1$ with $D_1 \subset \R$ and $d \in \N$.
+Given a multi-index $\bsnu \in \N_0^d$ characterizing the maximal polynomial degree in each dimension, we define $I^\bsnu : C^0(D) \to \bbP_\bsnu := {\rm span} \set{\bsx^\bsmu}{\bsmu \leq \bsnu}$ as
 \begin{equation}
     I^\bsnu := \otimes_{j=1}^d I^{\nu_j}.
 \end{equation}
 
-In this setting, the tensorized barycentric interpolation formula can be expressed as a repeated vector-tensor product
+The tensorized barycentric interpolation formula can be expressed as a repeated vector-tensor product
 \begin{equation} \label{eq:ip_tensorproduct}
     I^\bsnu [f] (\bsx) =
     \frac{\bsb^{\nu_1}(x_1) \bsb^{\nu_2}(x_2) \cdots \bsb^{\nu_d}(x_d) \bsF^\bsnu}
@@ -80,7 +82,7 @@ In this setting, the tensorized barycentric interpolation formula can be express
 with tensors $\bsF^\bsnu \in \R^{\bsnu+{\bm 1}} := \R^{(\nu_1+1) \times (\nu_2+1) \times \dots \times (\nu_d+1)}$ given as
 \begin{align*}
   F^\bsnu_{\bsmu} := f(\bsxi^\bsnu_\bsmu)  \text{ with }
-   \bsxi_\bsmu := \left(\xi^{\nu_1}_{\mu_1}, \xi^{\nu_2}_{\mu_2}, \dots, \xi^{\nu_d}_{\mu_d} \right) \quad \text{ for all }
+   \bsxi^\bsnu_\bsmu := \left(\xi^{\nu_1}_{\mu_1}, \xi^{\nu_2}_{\mu_2}, \dots, \xi^{\nu_d}_{\mu_d} \right) \quad \text{ for all }
    \bsmu \in \N_0^d \text{ s.t. } \bsmu \le \bsnu,
 \end{align*}
 and vectors $\bsb^{\nu_j} (x_j) \in \R^{\nu_j+1}$ given as
@@ -96,9 +98,9 @@ and vectors $\bsb^{\nu_j} (x_j) \in \R^{\nu_j+1}$ given as
 
 # Vectorizable implementation of the Smolyak operator for HPC
 
-To leverage key HPC techniques such as vectorization, parallelization, and batch processing, input data must conform to a uniform structure. However, the vectors and tensors in \eqref{eq:ip_smolyak} together with \eqref{eq:ip_tensorproduct} exhibit a wide range of shapes, which poses a challenge for efficient processing. In this section, we outline how a combination of squeezing, permuting, and padding can be used to reorganize these tensors into a small number of large, structured data blocks, enabling efficient computation while only incurring a modest memory overhead.
+To leverage key HPC techniques such as vectorization, parallelization, and batch processing, input data must conform to a uniform structure. However, the vectors and tensors in \eqref{eq:ip_smolyak} together with \eqref{eq:ip_tensorproduct} can exhibit a wide range of shapes, posing a challenge for efficient vectorization. In this section, we outline how a combination of squeezing, permuting, and padding can be used to reorganize these tensors into a small number of large, structured data blocks, enabling efficient computation while only incurring a modest memory overhead.
 
-**Squeezing and ordering the dimensions of the tensorized interpolator.**
+**Squeezing and permuting the dimensions of the tensorized interpolator.**
 For any multi-index $\bsnu \in \N_0^d$, denote with $t(\bsnu)$ the tuple consisting of the elements in $\{j \in \{1, ..., d\} \ : \ \nu_j > 0\}$ that order the non-zero entries of $\bsnu$ descendingly. Let further $\bsnu^t := (\nu_j)_{j \in t(\bsnu)}$ and $d_\bsnu := |\bsnu_t| \equiv |t(\bsnu)| = | \set{j \in \{1, ..., d\}}{\nu_j > 0}| \le d$.
 
 _Example: For the multi-index $\bsnu = (3,0,2,0,4) \in \N_0^5$, it holds that $t(\bsnu) = (5,1,3)$, $\bsnu^t = (4,3,2)$ and $d_\bsnu = 3$._
