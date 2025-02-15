@@ -1,0 +1,14 @@
+Metadata-Version: 2.2
+Name: jax_smolyak
+Version: 0.1.0
+Summary: A JAX package for Smolyak interpolation
+Author-email: Josephine Westermann <xx@xx.com>, Joshua Chen <joshuawchen@icloud.com>
+License: MIT
+Requires-Python: >=3.7
+License-File: LICENSE
+Requires-Dist: jax
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: pytype; extra == "dev"
+Requires-Dist: black; extra == "dev"
+Requires-Dist: flake8; extra == "dev"

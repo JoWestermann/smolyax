@@ -1,0 +1,16 @@
+Metadata-Version: 2.2
+Name: your_package
+Version: 0.1.0
+Summary: A sample JAX-based Python package
+Author: "Josephine Westermann"
+Author-email: Josephine Westermann <xx@xx.com>, Joshua Chen <joshuawchen@icloud.com>
+License: MIT
+Requires-Python: >=3.7
+License-File: LICENSE
+Requires-Dist: jax
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: pytype; extra == "dev"
+Requires-Dist: black; extra == "dev"
+Requires-Dist: flake8; extra == "dev"
+Dynamic: requires-python

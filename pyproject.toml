@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jax_smolyak"
+version = "0.1.0"
+description = "A JAX package for Smolyak interpolation"
+authors = [
+    { name = "Josephine Westermann", email = "xx@xx.com" },
+    { name = "Joshua Chen", email = "joshuawchen@icloud.com" }
+]
+license = { text = "MIT" }
+dependencies = [
+    "jax"
+]
+requires-python = ">=3.7"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytype",
+    "black",
+    "flake8"
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+
+[tool.flake8]
+max-line-length = 88
+
+[tool.pytype]
+python_version = "3.8"
+inputs = ["src/jax_smolyak"]
+disable = ["import-error"]
