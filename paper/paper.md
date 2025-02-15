@@ -57,8 +57,7 @@ We briefly summarize the essentials of high-dimensional interpolation, where spa
 
 **Univariate interpolation.** Given a domain $D \subset \R$ and set of $\ell \in \N$ pairwise distinct interpolation points $(\xi^\ell_i)_{i=0}^\ell \subset D$, the polynomial interpolation operator $I^\ell : C^0(D) \to \bbP_\ell := {\rm span} \set{x^i}{i=0,\dots,\ell}$ is the mapping of a function $f$ onto the unique polynomial $I^\ell [f]$ of maximal degree $\ell$ such that $f(\xi^\ell_i) = I^\ell [f](\xi^\ell_i)$ for all $i\in\{0,1,\dots,\ell\}$.
 
-A classical method for evaluating the interpolating polynomial that is known for numerical stability is barycentric interpolation
-One way to compute the interpolating polynomial that is known for its numerical stability is barycentric interpolation [@berrut:2004]. The univariate barycentric interpolation formula is given as
+A classical method for evaluating the interpolating polynomial that is known for numerical stability is barycentric interpolation [@berrut:2004]. The univariate barycentric interpolation formula is given as
 \begin{align}
     I^\ell [f] (x) := \frac{\sum_{i=0}^\ell b_i^\ell(x) f(\xi^\ell_i)}{\sum_{i=0}^\ell b_i^\ell(x)},
     \qquad \text{ with }
