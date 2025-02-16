@@ -97,10 +97,16 @@ and vectors $\bsb^{\nu_j} (x_j) \in \R^{\nu_j+1}$ given as
 
 # Vectorizable implementation of the Smolyak operator for HPC
 
-To leverage key HPC techniques such as vectorization, parallelization, and batch processing, input data must conform to a uniform structure. However, the vectors and tensors in \eqref{eq:ip_smolyak} together with \eqref{eq:ip_tensorproduct} can exhibit a wide range of shapes, posing a challenge for efficient vectorization. In this section, we outline how a combination of squeezing, permuting, and padding can be used to reorganize these tensors into a small number of large, structured data blocks, enabling efficient computation while only incurring a modest memory overhead.
+To leverage key HPC techniques such as vectorization, parallelization, and batch processing, input data must conform to a uniform structure. However, the vectors and tensors in \eqref{eq:ip_smolyak} together with \eqref{eq:ip_tensorproduct} can exhibit a wide range of shapes, posing a challenge for efficient vectorization. A naive approach would be to zero-pad all tensors $\bsF^\bsnu$ in \eqref{eq:ip_smolyak} to the smallest possible common shape $(\max_{\bsnu \in \Lambda}(\nu_j))_{j=1}^d$. This approach, however, suffers from the curse of dimensionality, as memory requirements grow exponentially with $d$. With our implementation we navigate in between these two extremes of handling a large number of small tensors and a single, massive tensor. The key idea is to set up all tensors by:
+\begin{itemize}
+\item[1.] Dropping indices ("\textit{squeezing}") $j$ of non-active dimensions, i.e., those with $\nu_j = 0$,
+\item[2.] Permuting the remaining active dimensions in descending order, and
+\item[3.] Zero-padding all tensors with the same number of active dimensions to the smallest common shape.
+\end{itemize}
+This reorganizes the tensors into a small number of large, structured data blocks, enabling efficient computation while keeping memory overhead modest.
 
 **Squeezing and permuting the dimensions of the tensorized interpolator.**
-For any multi-index $\bsnu \in \N_0^d$, denote with $t(\bsnu)$ the tuple consisting of the elements in $\{j \in \{1, ..., d\} \ : \ \nu_j > 0\}$ that order the non-zero entries of $\bsnu$ descendingly. Let further $\bsnu^t := (\nu_j)_{j \in t(\bsnu)}$ and $d_\bsnu := |\bsnu_t| \equiv |t(\bsnu)| = | \set{j \in \{1, ..., d\}}{\nu_j > 0}| \le d$.
+For any multi-index $\bsnu \in \N_0^d$, denote with $t(\bsnu)$ the tuple consisting of the elements in $\{j \in \{1, ..., d\} \ : \ \nu_j > 0\}$ that permute the non-zero entries of $\bsnu$ descendingly. Let further $\bsnu^t := (\nu_j)_{j \in t(\bsnu)}$ and $d_\bsnu := |\bsnu_t| \equiv |t(\bsnu)| = | \set{j \in \{1, ..., d\}}{\nu_j > 0}| \le d$.
 
 _Example: For the multi-index $\bsnu = (3,0,2,0,4) \in \N_0^5$, it holds that $t(\bsnu) = (5,1,3)$, $\bsnu^t = (4,3,2)$ and $d_\bsnu = 3$._
 
@@ -119,7 +125,7 @@ with $\bsF^{\bsnu,t} \in \R^{\bsnu^t + {\bm 1}}$ given as $F^{\bsnu,t}_{\bsmu} :
     \xi^{\nu_j}_0 &\text{ else.}
     \end{cases}
 \end{align*}
-This construction is equivalent to \eqref{eq:ip_tensorproduct} since for any dimension $j$ with $\nu_j = 0$ it holds that $\bsb^{\nu_j}(x_j) = (1)_{i=0}^0$.
+This construction is equivalent to \eqref{eq:ip_tensorproduct} since for any dimension $j$ with $\nu_j = 0$ it holds that the corresponding weight vector $\bsb^{\nu_j}(x_j)$ is a one-dimensional vector with entry $1$, i.e. $\bsb^{\nu_j}(x_j) = (1) \in \R^1$.
 
 **Padding tensorized interpolators to a common shape.** For any multi-index $\bstau \in \N_0^k$, define the padding operator $p^\bstau$ that acts on any order-$k$ tensor $\bsT \in \R^{\bsrho}$ with $\bsrho \le \bstau$ as
 $$p^\bstau(\bsT) \in \R^{\bstau}, \ p^\bstau(\bsT)_{\bsmu} :=
@@ -164,7 +170,7 @@ We now have everything in place to construct the Smolyak interpolant in a form t
   \end{algorithmic}
 \end{algorithm}
 
-# Scope of jax-smolyak
+# Software capabilities of \textsc{jax-smolyak}
 
 The library provides interpolation capabilities for arbitrary multivariate and vector-valued functions $f : \mathbb{R}^{d_1} \to \mathbb{R}^{d_2}$ for any $d_1, d_2 \in \mathbb{N}$. While the previous discussion focused on scalar-valued interpolation targets (i.e., the case $d_2 = 1$), the extension to vector-valued functions is straightforward and works seamlessly, provided that all interpolants in the codomain are constructed using the same multi-index set $\Lambda$.
 
