@@ -44,7 +44,7 @@ class MultivariateSmolyakBarycentricInterpolator:
 
         # Compute coefficients and multi-indices of the Smolyak Operator
         zetas = []
-        indxs_all = indices.indexset_sparse_stack(lambda j: k[j], l, cutoff=self.d)
+        indxs_all = indices.indexset_sparse(lambda j: k[j], l, cutoff=self.d)
         indxs_zeta = []
         for idx in indxs_all:
             zeta = indices.smolyak_coefficient_zeta_sparse(
@@ -137,9 +137,15 @@ class MultivariateSmolyakBarycentricInterpolator:
 
         # l > 0
         for l in self.data.keys():
+            data_l = self.data[l]
+            data_l_t = self.data[l]["t"]
+            data_l_n = self.data[l]["n"]
             for i, nu in enumerate(self.k_2_lambda_k[l]):
                 degrees = indices.sparse_index_to_dense(nu, self.d)
                 x = copy.deepcopy(self.zero)
+
+                data_l_t_i = data_l_t[i]
+                data_l_f_i = data_l["F"][i]
 
                 if self.is_nested:
                     Fo = F
@@ -147,13 +153,13 @@ class MultivariateSmolyakBarycentricInterpolator:
                     Fo = F.get(degrees, {})
 
                 for idx in it.product(*(range(d + 1) for d in degrees)):
-                    ridx = tuple(idx[j] for j in self.data[l]["t"][i])
+                    ridx = (idx[j] for j in data_l_t_i)
                     if idx not in Fo.keys():
-                        for k, (dim, deg) in enumerate(zip(self.data[l]["t"][i], ridx)):
-                            x[dim] = self.data[l]["n"][k][i][deg]
+                        for k, (dim, deg) in enumerate(zip(data_l_t_i, ridx)):
+                            x[dim] = data_l_n[k][i][deg]
                         Fo[idx] = f(x)
                         self.n_f_evals += 1
-                    self.data[l]["F"][i][:, *ridx] = Fo[idx]
+                    data_l_f_i[:, *ridx] = Fo[idx]
 
                 if not self.is_nested:
                     F[degrees] = Fo

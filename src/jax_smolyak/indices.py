@@ -32,26 +32,61 @@ def smolyak_coefficient_zeta_dense(k, l, *, nu=None):
     return np.sum([(-1) ** (np.sum(e)) for e in unitball(nu, k, l)])
 
 
-def indexset_sparse(k, l, i=0, idx=None, *, cutoff=None):
+def indexset_sparse(k, l, cutoff, i=0, idx=None):
     if idx is None:
-        idx = {}
-    if cutoff is not None and i >= cutoff:
+        idx = cykhash.Int32toInt32Map()
+    if i >= cutoff:
         return [idx]
     r = []
-    if (cutoff is None or i + 1 < cutoff) and k(i + 1) < l:
-        r += indexset_sparse(k, l, i + 1, idx, cutoff=cutoff)
+    if (i + 1 < cutoff) and k(i + 1) < l:
+        r += indexset_sparse(k, l, cutoff, i + 1, idx)
     else:
         r += [idx]
     j = 1
     while j * k(i) < l:
-        r += indexset_sparse(k, l - j * k(i), i + 1, {**idx, i: j}, cutoff=cutoff)
+        if i not in idx:  # Only allow `i: j` if it hasn't been assigned
+            idx[i] = j  # Assign `i: j`
+            r += indexset_sparse(k, l - j * k(i),cutoff, i + 1, idx)
+            del idx[i]  # Restore state after recursion
         j += 1
     return r
 
-def abs_e_sparse(k, l, i=0, e=None, *, nu=None, cutoff=None):
+import cykhash
+def indexset_sparse_count_fast_w_cutoff(k, l, cutoff, i=0, idx=None):
+    """Optimized recursive count of sparse index sets while preventing redundancy."""
+    
+    if idx is None:
+        idx = cykhash.Int32toInt32Map()
+
+    # Base case: If depth is exceeded, count as valid
+    if i >= cutoff:
+        return 1
+
+    count_val = 0
+
+    # Case 1: Skip k(i) and move to the next index
+    if (i + 1 < cutoff) and k(i + 1) < l:
+        count_val += indexset_sparse_count_fast_w_cutoff(k, l, cutoff, i + 1, idx)
+    else:
+        count_val += 1
+
+    # Case 2: Include multiples of k(i) and recurse
+    j = 1
+    while j * k(i) < l:
+        if i not in idx:  # Only allow `i: j` if it hasn't been assigned
+            idx[i] = j  # Assign `i: j`
+            count_val += indexset_sparse_count_fast_w_cutoff(k, l - j * k(i),cutoff, i + 1, idx)
+            del idx[i]  # Restore state after recursion
+        j += 1
+
+    return count_val
+
+
+def abs_e_sparse(k, l, i=0, e=None, *, nu=None, cutoff=None): #speed me up!
     if e is None:
         assert i == 0 and nu is not None
         e = 0
+        # print(nu)
         l -= np.sum([nu[j] * k(j) for j in nu.keys()])
     if cutoff is not None and i >= cutoff:
         return [e]
@@ -64,6 +99,66 @@ def abs_e_sparse(k, l, i=0, e=None, *, nu=None, cutoff=None):
         r += abs_e_sparse(k, l - k(i), i + 1, e + 1, cutoff=cutoff)
     return r
 
+#scratchwork. needs k to be an array, and need to think abuot sparse nu, maybe making it dense before this function so that the inner product is fast?
+# @numba.njit(fastmath=True, cache=True)
+def abs_e_sparse_fast_pow_w_cutoff_numba(k, l, cutoff, i=0, e=-1, nu=None):
+    """Optimized version with bitwise operations, direct assignments, and proper handling of `nu`."""
+    
+    # Ensure `e` is properly initialized
+    if e == -1:  # Equivalent to `if e is None` but works with numba
+        e = 0
+        if nu is not None:  # **Fix: Only compute `l -= sum(...)` if `nu` exists**
+            l -= np.sum(np.array([nu[j] * k[j] for j in nu], dtype=np.int64))  
+
+    # **Base Case: If `i >= cutoff`, compute (-1)^e directly**
+    if i >= cutoff:
+        return 1 - ((e & 1) << 1)  # Optimized (-1)^e using bit-shift
+
+    i_plus_1 = i + 1  # Precompute to avoid redundant calculations
+
+    # **Case 1: Skip `k[i]` and move to the next index**
+    should_recurse_1 = (i_plus_1 < cutoff) & (k[i_plus_1] < l)  # Bitwise AND for branching avoidance
+
+    count_val = (
+        should_recurse_1 * abs_e_sparse_fast_pow_w_cutoff_numba(k, l, cutoff, i_plus_1, e, nu)  # Recursively call only when needed
+        + (1 - ((e & 1) << 1)) * ~should_recurse_1  # Compute (-1)^e if recursion is skipped
+    )
+
+    # **Case 2: Include `k[i]` and recurse**
+    k_i = k[i] 
+    should_recurse_2 = k_i < l  # Avoid unnecessary recursion
+
+    count_val += should_recurse_2 * abs_e_sparse_fast_pow_w_cutoff_numba(k, l - k_i, cutoff, i_plus_1, e + 1, nu)
+
+    return count_val
+
+def abs_e_sparse_fast_pow_w_cutoff(k, l, cutoff, i=0, e=None, *, nu=None):
+    """Optimized version of abs_e_sparse applying `& 1` inline."""
+    if e is None:
+        # assert i == 0 and nu is not None
+        e = 0
+        # print(nu)  # Debugging print (optional)
+        l -= sum(nu[j] * k(j) for j in nu)  # Precompute modified `l`
+
+    if i >= cutoff:
+        return 1 - 2 * (e & 1)  # Directly compute (-1)^e
+
+    count_val = 0  # Accumulator for sum
+
+    # Case 1: Skip k(i) and move to the next index
+    i_plus_1 = i + 1
+    if (i_plus_1< cutoff) and k(i_plus_1) < l:
+        count_val += abs_e_sparse_fast_pow_w_cutoff(k, l, cutoff, i_plus_1, e)
+
+    else:
+        count_val += 1 - 2 * (e & 1)  # Inline computation of (-1)^e
+
+    # Case 2: Include k(i) and recurse
+    k_i = k(i)
+    if k_i < l:
+        count_val += abs_e_sparse_fast_pow_w_cutoff(k, l - k_i, cutoff, i_plus_1, e + 1)
+
+    return count_val
 
 def count_index_sets(k, l, cutoff=None):
     """
@@ -154,7 +249,7 @@ def abs_e_sparse_stack(k, l, *, nu=None, cutoff=None):
     l -= np.sum([nu[j] * k(j) for j in nu.keys()])
 
     # Precompute the expected size
-    precomputed_size = count_abs_e_sparse(k, l, nu, cutoff)
+    precomputed_size = count_abs_e_sparse(k, l, nu, cutoff) 
     results = np.empty(precomputed_size, dtype=int)  # Preallocate results array
     index = 0  # Index for inserting results
 
@@ -184,7 +279,11 @@ def abs_e_sparse_stack(k, l, *, nu=None, cutoff=None):
 
 
 def smolyak_coefficient_zeta_sparse(k, l, *, nu=None, cutoff=None):
-    return np.sum([(-1) ** e for e in abs_e_sparse_stack(k, l, nu=nu, cutoff=cutoff)])
+    # real = np.sum(1 - 2 * (np.array(abs_e_sparse(k, l, nu=nu, cutoff=cutoff)) & 1))
+    # print(real)
+    # fake = abs_e_sparse_fast_pow(k, l, nu=nu, cutoff=cutoff)
+    # print("fake",fake, "\n")
+    return  abs_e_sparse_fast_pow_w_cutoff(k, l, cutoff, nu=nu)
 
 
 def sparse_index_to_dense(nu, cutoff=None):
@@ -205,15 +304,26 @@ def dense_index_to_sparse(nu):
 
 
 def n_points(kmap, l, cutoff, nested=False):
-    iset = indexset_sparse_stack(kmap, l, cutoff=cutoff)
-
+    # print("computing n_points")
+    # iset = indexset_sparse(kmap, l, cutoff=cutoff)
+    # assert all(indexset_sparse(kmap, l, cutoff=cutoff) == indexset_sparse_stack(kmap, l, cutoff=cutoff))
     if nested:
-        return len(iset)
-
+        # iset = indexset_sparse(kmap, l, cutoff=cutoff)
+        # print(indexset_sparse_count_fast(kmap, l, cutoff=cutoff))
+        # try:
+        #     print("other",indexset_sparse_count(kmap, l, cutoff=cutoff))
+        # except:
+        #     pass
+        return indexset_sparse_count_fast_w_cutoff(kmap, l, cutoff) #len(iset)
+        
+    else:
+        iset = indexset_sparse(kmap, l, cutoff=cutoff)
     n = 0
     for nu in iset:
-        c = np.sum([(-1) ** e for e in abs_e_sparse_stack(kmap, l, nu=nu, cutoff=cutoff)])
+        c = np.sum(1 - 2 * (np.array(abs_e_sparse(kmap, l, nu=nu, cutoff=cutoff)) & 1))
+        print("computed c")
         if c != 0:
+            print(nu.values(), "nu values")
             n += np.prod([v + 1 for v in nu.values()])
     return n
 
