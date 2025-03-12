@@ -1,0 +1,24 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.8'
+      - name: Install dependencies
+        run: |
+          pip install .[dev]
+      - name: Run Tests
+        run: pytest tests/
+      - name: Run Type Checking (pytype)
+        run: pytype
+      - name: Run Linter (flake8)
+        run: flake8 src/
+      - name: Run Formatter Check (black)
+        run: black --check src/
