@@ -1,0 +1,11 @@
+.ipynb_checkpoints
+__pycache__
+.idea
+.pytype/
+*.pdf
+paper/jats
+*.pyc
+*.pyo
+*.pyd
+*.egg-info
+build/*git st
