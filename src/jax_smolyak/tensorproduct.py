@@ -1,7 +1,7 @@
 import numpy as np
 import itertools as it
 
-import points, indices
+from . import points, indices
 
 np.seterr(divide='raise')
 

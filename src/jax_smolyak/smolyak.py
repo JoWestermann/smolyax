@@ -1,8 +1,8 @@
 import numpy as np
 import itertools as it
 
-import indices
-from tensorproduct import TensorProductBarycentricInterpolator
+from . import indices
+from .tensorproduct import TensorProductBarycentricInterpolator
 
 
 class SmolyakBarycentricInterpolator :

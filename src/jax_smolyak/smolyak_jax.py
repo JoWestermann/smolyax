@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 import itertools as it
 
-import indices
+from . import indices
 
 jax.config.update("jax_enable_x64", True)
 
