@@ -2,9 +2,10 @@ import scipy as sp
 import numpy as np
 import itertools as it
 
-import points, indices
+from jax_smolyak import points
+from jax_smolyak import indices
 
-from tensorproduct import *
+from jax_smolyak.tensorproduct import *
 
 import setup
 

@@ -1,6 +1,6 @@
 import numpy
 
-from points import *
+from jax_smolyak.points import *
 
 
 def generate_pointsets(n, dmax) :

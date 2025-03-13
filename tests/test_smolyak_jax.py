@@ -1,7 +1,7 @@
 import numpy as np
 
-from smolyak import MultivariateSmolyakBarycentricInterpolator as SmolN
-from smolyak_jax import MultivariateSmolyakBarycentricInterpolator as SmolJ
+from jax_smolyak.smolyak import MultivariateSmolyakBarycentricInterpolator as SmolN
+from jax_smolyak.smolyak_jax import MultivariateSmolyakBarycentricInterpolator as SmolJ
 
 import setup, test_smolyak
 

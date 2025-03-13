@@ -1,6 +1,6 @@
 import numpy as np
 
-from points import *
+from jax_smolyak.points import *
 
 import setup
 

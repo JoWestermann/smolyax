@@ -1,7 +1,7 @@
 import numpy as np
 import itertools as it
 
-from indices import *
+from jax_smolyak.indices import *
 
 
 def get_random_indexsets(nested=False) :

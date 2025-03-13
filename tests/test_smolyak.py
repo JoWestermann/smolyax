@@ -1,6 +1,6 @@
 import numpy as np
 
-from smolyak import *
+from jax_smolyak.smolyak import *
 
 import setup, test_tensorproduct
 
