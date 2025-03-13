@@ -14,7 +14,7 @@ license = { text = "MIT" }
 dependencies = [
     "jax"
 ]
-requires-python = ">=3.7"
+requires-python = ">=3.10"
 
 [project.optional-dependencies]
 dev = [
@@ -26,12 +26,12 @@ dev = [
 
 [tool.black]
 line-length = 88
-target-version = ['py38']
+target-version = ['py310']
 
 [tool.flake8]
 max-line-length = 88
 
 [tool.pytype]
-python_version = "3.8"
+python_version = "3.10"
 inputs = ["src/jax_smolyak"]
 disable = ["import-error"]
