@@ -138,7 +138,7 @@ class MultivariateSmolyakBarycentricInterpolator :
                             x[dim] = self.data[l]['n'][k][i][deg]
                         Fo[idx] = f(x)
                         self.n_f_evals += 1
-                    self.data[l]['F'][i][:, *ridx] = Fo[idx]
+                    self.data[l]['F'][i][:,*ridx] = Fo[idx]
 
                 if not self.is_nested : F[degrees] = Fo
 

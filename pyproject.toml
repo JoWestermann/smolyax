@@ -14,7 +14,7 @@ license = { text = "MIT" }
 dependencies = [
     "jax"
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 
 [project.optional-dependencies]
 dev = [
