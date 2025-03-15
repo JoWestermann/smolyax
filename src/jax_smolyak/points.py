@@ -171,7 +171,10 @@ class Leja(Points):
 
 
 class Multi:
-
+    @property
+    def is_nested(self) -> bool:
+        return self._is_nested
+    
     def __init__(self, gs):
         self.gs = gs
         self.d = len(self.gs)
