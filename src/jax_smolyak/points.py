@@ -175,7 +175,7 @@ class Multi:
     def __init__(self, gs):
         self.gs = gs
         self.d = len(self.gs)
-        self.is_nested = gs[0].is_nested
+        self._is_nested = gs[0].is_nested
 
     def __getitem__(self, i):
         return self.gs[i]
@@ -200,11 +200,6 @@ class GaussHermiteMulti(Multi):
     def __init__(self, mlist, alist):
         Multi.__init__(self, [GaussHermite(m, a) for m, a in zip(mlist, alist)])
 
-    def print(self):
-        print(f"\tGauss Hermite in d = {len(self.gs)}")
-        for g in self.gs:
-            print(f"\t\t m = {g.m}, a = {g.a}")
-
     def __repr__(self):
         return (
             f"\tGauss Hermite in d = {self.d}"
@@ -221,11 +216,6 @@ class LejaMulti(Multi):
             Multi.__init__(self, [Leja() for _ in range(d)])
         else:
             raise
-
-    def print(self):
-        print(f"\tLeja in d = {len(self.gs)}")
-        for g in self.gs:
-            print(f"\t\t domain = {g.domain}")
 
     def __repr__(self):
         return f"\tLeja in d = {len(self.gs)}" f"\t\t domain = {self.g.domain}"
