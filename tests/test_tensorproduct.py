@@ -58,7 +58,7 @@ def test_tensorproduct_interpolation():
         k = np.random.randint(low=1, high=7, size=g.d)
 
         print("Testing with d = {}, k = {}".format(g.d, k))
-        g.print()
+        print(g)
         k = {k: v for k, v in enumerate(k) if v > 0}
 
         ip = TensorProductBarycentricInterpolator(g, k, g.d)
