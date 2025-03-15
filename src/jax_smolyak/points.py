@@ -203,7 +203,7 @@ class GaussHermiteMulti(Multi):
     def __repr__(self):
         return (
             f"\tGauss Hermite in d = {self.d}"
-            f"\t\t mean = {self.g.m}, diagonal scaling = {self.g.a}"
+            f"\t\t mean = {(g.m for g in self.gs)}, diagonal scaling = {(g.a for g in self.gs)}"
         )
 
 
