@@ -218,4 +218,4 @@ class LejaMulti(Multi):
             raise
 
     def __repr__(self):
-        return f"\tLeja in d = {len(self.gs)}" f"\t\t domain = {self.g.domain}"
+        return f"\tLeja in d = {self.d}" f"\t\t domain = {(g.domain for g in self.gs)}"
