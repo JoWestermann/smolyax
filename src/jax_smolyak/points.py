@@ -8,6 +8,7 @@ class Points(ABC):
     """Abstract base class for interpolation points"""
 
     @property
+    @abstractmethod
     def is_nested(self) -> bool:
         return self._is_nested
 
@@ -32,6 +33,9 @@ class Points(ABC):
 class GaussHermite(Points):
     """Gauss-Hermite grid points"""
 
+    def is_nested(self) -> bool:
+        return self._is_nested
+    
     _is_nested = False
 
     def __init__(self, m: ArrayLike, a: ArrayLike) -> None:
@@ -74,6 +78,9 @@ class GaussHermite(Points):
 class Leja(Points):
     """Leja grid points"""
 
+    def is_nested(self) -> bool:
+        return self._is_nested
+    
     nodes = np.array([0, 1, -1, 1 / np.sqrt(2), -1 / np.sqrt(2)])
     _is_nested = True
     _default_domain = [-1, 1]
