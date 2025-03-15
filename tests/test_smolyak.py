@@ -45,12 +45,12 @@ def test_smolyak_univariate() :
 
 def test_smolyak_multivariate() :
 
-    for g in setup.generate_pointsets(10,3) :
+    for g in setup.generate_pointsets(10,5) :
 
         k = sorted(np.random.randint(low=1, high=10, size=g.d))
         k /= k[0]
         d2 = np.random.randint(low=1, high=5)
-        k2 = sorted(np.random.randint(low=1, high=10, size=d2), reverse=True)
+        k2 = sorted(np.random.randint(low=1, high=4, size=d2), reverse=True)
         print(f'Testing with d2 = {d2}, k2 = {k2}')
 
         ip = MultivariateSmolyakBarycentricInterpolator(g=g, k=k, l=k2)
