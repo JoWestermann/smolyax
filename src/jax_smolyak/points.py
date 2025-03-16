@@ -9,9 +9,8 @@ class Points(ABC):
 
     @property
     @abstractmethod
-    def is_nested(self) -> bool:
-        return self._is_nested
-
+    def is_nested(self) -> bool: ...
+    
     @abstractmethod
     def __call__(self, n: int): ...
 
