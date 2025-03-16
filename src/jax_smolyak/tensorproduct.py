@@ -2,7 +2,7 @@ import itertools as it
 
 import numpy as np
 
-from . import indices, points
+from . import indices
 
 np.seterr(divide="raise")
 
@@ -68,7 +68,7 @@ class TensorProductBarycentricInterpolator:
                     b = self.weights[o] / b
                 except (ZeroDivisionError, FloatingPointError):
                     b = np.where(b == 0, 1.0, 0.0)
-                res = np.einsum(f"i,i...->...", b, res)
+                res = np.einsum("i,i...->...", b, res)
                 res /= np.sum(b)
             return res
 
@@ -86,8 +86,8 @@ class TensorProductBarycentricInterpolator:
                 b[rows_with_zero] = np.where(b[rows_with_zero] == 0, 1.0, 0.0)
                 b[rows_without_zero] = self.weights[o] / b[rows_without_zero]
             if i == 0:
-                res = np.einsum(f"ij,j...->i...", b, res)
+                res = np.einsum("ij,j...->i...", b, res)
             else:
-                res = np.einsum(f"ij,ij...->i...", b, res)
+                res = np.einsum("ij,ij...->i...", b, res)
             norm *= np.sum(b, axis=1)
         return res / norm

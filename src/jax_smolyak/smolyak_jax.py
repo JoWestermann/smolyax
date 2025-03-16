@@ -23,9 +23,9 @@ def __evaluate_tensorproduct_interpolant(
         normal = w_list[i] / b
         b = jnp.where(has_zero[:, None], zero_pattern, normal)
         if i == 0:
-            F = jnp.einsum(f"ij,kj...->ik...", b, F)
+            F = jnp.einsum("ij,kj...->ik...", b, F)
         else:
-            F = jnp.einsum(f"ij,ikj...->ik...", b, F)
+            F = jnp.einsum("ij,ikj...->ik...", b, F)
         norm *= jnp.sum(b, axis=1)
     return F / norm[:, None]
 
@@ -33,9 +33,10 @@ def __evaluate_tensorproduct_interpolant(
 def _create_evaluate_tensorproduct_interpolant_for_vmap(k: int):
     def wrapped_function(x, F, *args):
         m_list = args[:k]
-        w_list = args[k: 2 * k]
+        w_list = args[k:2 * k]
         j_list = args[2 * k]
         return __evaluate_tensorproduct_interpolant(x, F, m_list, w_list, j_list)
+
     return jax.jit(wrapped_function)
 
 
@@ -45,7 +46,9 @@ class MultivariateSmolyakBarycentricInterpolator:
     def is_nested(self) -> bool:
         return self._is_nested
 
-    def __init__(self, *, g, k, l, rank: int, f: Callable = None, batchsize: int = 250) -> None:
+    def __init__(
+        self, *, g, k, l, rank: int, f: Callable = None, batchsize: int = 250
+    ) -> None:
         self.d = len(k)
         self.d_out = rank
         self._is_nested = g._is_nested

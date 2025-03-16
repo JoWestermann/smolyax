@@ -67,9 +67,6 @@ class GaussHermite(Points):
     def scale_back(self, x: ArrayLike) -> ArrayLike:
         return (x - self.m) / self.a
 
-    def get_random(self, shape=(1,)) -> ArrayLike:
-        return self.scale(np.random.randn(*shape))
-
     def get_random(self) -> ArrayLike:
         return self.scale(np.random.randn())
 

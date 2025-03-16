@@ -1,7 +1,10 @@
+from typing import Mapping
+
 import numpy as np
 
-
 # deprecated
+
+
 def indexset_dense(k, l, idx=None):
     if idx is None:
         idx = ()
@@ -69,24 +72,24 @@ def smolyak_coefficient_zeta_sparse(k, l, *, nu=None, cutoff=None):
     return np.sum([(-1) ** e for e in abs_e_sparse(k, l, nu=nu, cutoff=cutoff)])
 
 
-def sparse_index_to_dense(nu, cutoff=None):
+def sparse_index_to_dense(nu, cutoff=None) -> tuple:
     if cutoff is None:
         cutoff = max(nu.keys())
-    nnu = [0] * cutoff
+    dense_nu = [0] * cutoff
     for k, v in nu.items():
-        nnu[k] = v
-    return tuple(nnu)
+        dense_nu[k] = v
+    return tuple(dense_nu)
 
 
-def dense_index_to_sparse(nu):
-    nnu = {}
-    for k, v in enumerate(nu):
+def dense_index_to_sparse(dense_nu):
+    sparse_nu = {}
+    for k, v in enumerate(dense_nu):
         if v > 0:
-            nnu[k] = v
-    return nnu
+            sparse_nu[k] = v
+    return sparse_nu
 
 
-def n_points(kmap, l, cutoff, nested=False):
+def n_points(kmap, l, cutoff, nested: bool = False) -> int:
     iset = indexset_sparse(kmap, l, cutoff=cutoff)
 
     if nested:
@@ -100,9 +103,12 @@ def n_points(kmap, l, cutoff, nested=False):
     return n
 
 
-def find_suitable_l(k, n=50, nested=False):
+def find_suitable_l(k: Mapping, n: int = 50, nested: bool = False) -> int:
     assert n > 0
-    def kmap(j): return k[j]
+
+    def kmap(j):
+        return k[j]
+
     cutoff = len(k)
 
     if n == 1:
@@ -116,7 +122,9 @@ def find_suitable_l(k, n=50, nested=False):
         l_interval[1] *= 1.2
 
     # bisect search interval
-    def midpoint(interval): return interval[0] + (interval[1] - interval[0]) / 2
+    def midpoint(interval):
+        return interval[0] + (interval[1] - interval[0]) / 2
+
     l_cand = midpoint(l_interval)
     n_cand = n_points(kmap, l_cand, cutoff, nested)
     for _ in range(32):
