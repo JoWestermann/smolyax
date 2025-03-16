@@ -185,7 +185,7 @@ class Multi:
     def __init__(self, gs):
         self.gs = gs
         self.d = len(self.gs)
-        self._is_nested = gs[0].is_nested
+        self._is_nested = gs[0]._is_nested
 
     def __getitem__(self, i):
         return self.gs[i]

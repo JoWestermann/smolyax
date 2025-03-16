@@ -17,7 +17,7 @@ class SmolyakBarycentricInterpolator:
         self.k = k
         self.operators = []
         self.coefficients = []
-        self._is_nested = g.is_nested
+        self._is_nested = g._is_nested
         kmap = lambda j: k[j]
 
         i = indices.indexset_sparse(kmap, l, cutoff=len(k))

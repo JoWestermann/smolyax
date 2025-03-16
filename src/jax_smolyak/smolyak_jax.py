@@ -48,7 +48,7 @@ class MultivariateSmolyakBarycentricInterpolator:
     def __init__(self, *, g, k, l, rank: int, f: Callable = None, batchsize: int = 250) -> None:
         self.d = len(k)
         self.d_out = rank
-        self._is_nested = g.is_nested
+        self._is_nested = g._is_nested
 
         # Compute coefficients and multi-indices of the Smolyak Operator
         zetas = []
