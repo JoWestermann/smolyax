@@ -10,7 +10,7 @@ class Points(ABC):
     @property
     @abstractmethod
     def is_nested(self) -> bool: ...
-    
+
     @abstractmethod
     def __call__(self, n: int): ...
 
@@ -34,7 +34,7 @@ class GaussHermite(Points):
 
     def is_nested(self) -> bool:
         return self._is_nested
-    
+
     _is_nested = False
 
     def __init__(self, m: ArrayLike, a: ArrayLike) -> None:
@@ -79,7 +79,7 @@ class Leja(Points):
 
     def is_nested(self) -> bool:
         return self._is_nested
-    
+
     nodes = np.array([0, 1, -1, 1 / np.sqrt(2), -1 / np.sqrt(2)])
     _is_nested = True
     _default_domain = [-1, 1]
@@ -149,10 +149,10 @@ class Leja(Points):
             for j in range(x.shape[0]):
                 assert x[j, i] >= d1[i, 0] or np.isclose(
                     x[j, i], d1[i, 0]
-                ), f"Assertion failed with\n x[{j},{i}] ({x[j,i]})\n d1[{i},0] ({d1[i,0]})"
+                ), f"Assertion failed with\n x[{j},{i}] ({x[j, i]})\n d1[{i},0] ({d1[i, 0]})"
                 assert x[j, i] <= d1[i, 1] or np.isclose(
                     x[j, i], d1[i, 1]
-                ), f"Assertion failed with\n x[{j},{i}] ({x[j,i]})\n d1[i,1] ({d1[i,1]})"
+                ), f"Assertion failed with\n x[{j},{i}] ({x[j, i]})\n d1[i,1] ({d1[i, 1]})"
 
         # check
         assert len(x.shape) == len(d1.shape) == len(d2.shape) == 2
@@ -180,7 +180,7 @@ class Multi:
     @property
     def is_nested(self) -> bool:
         return self._is_nested
-    
+
     def __init__(self, gs):
         self.gs = gs
         self.d = len(self.gs)

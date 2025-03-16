@@ -102,7 +102,7 @@ def n_points(kmap, l, cutoff, nested=False):
 
 def find_suitable_l(k, n=50, nested=False):
     assert n > 0
-    kmap = lambda j: k[j]
+    def kmap(j): return k[j]
     cutoff = len(k)
 
     if n == 1:
@@ -116,7 +116,7 @@ def find_suitable_l(k, n=50, nested=False):
         l_interval[1] *= 1.2
 
     # bisect search interval
-    midpoint = lambda interval: interval[0] + (interval[1] - interval[0]) / 2
+    def midpoint(interval): return interval[0] + (interval[1] - interval[0]) / 2
     l_cand = midpoint(l_interval)
     n_cand = n_points(kmap, l_cand, cutoff, nested)
     for _ in range(32):

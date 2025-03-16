@@ -33,7 +33,7 @@ def __evaluate_tensorproduct_interpolant(
 def _create_evaluate_tensorproduct_interpolant_for_vmap(k: int):
     def wrapped_function(x, F, *args):
         m_list = args[:k]
-        w_list = args[k : 2 * k]
+        w_list = args[k: 2 * k]
         j_list = args[2 * k]
         return __evaluate_tensorproduct_interpolant(x, F, m_list, w_list, j_list)
     return jax.jit(wrapped_function)
