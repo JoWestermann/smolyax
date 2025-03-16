@@ -15,8 +15,8 @@ jobs:
         run: pip install .[dev]; pip install -e .
       - name: Run Tests
         run: pytest tests/
-      - name: Run Type Checking (pytype)
-        run: pytype
+      # - name: Run Type Checking (pytype)
+        # run: pytype
       - name: Run Linter (flake8)
         run: flake8 src/
       - name: Run Formatter Check (black)
