@@ -1,67 +1,53 @@
-import numpy as np
 import setup
-import test_tensorproduct
 
 from jax_smolyak.smolyak import *
 
+import numpy as np
+import warnings
 
-def generate_test_function_univariate(ip, n=1):
-    coeffs = np.random.rand(n) * 2 - 1
-    coeffs /= len(coeffs)
-    idxs = np.random.randint(low=0, high=len(ip.operators), size=n)
-    fs = [test_tensorproduct.generate_test_function(ip.operators[i]) for i in idxs]
-
-    def test_f(x, coeffs, fs):
-        res = 0
-        for c, fi in zip(coeffs, fs):
-            res += c * fi(x)
-        return res
-
-    return lambda x: test_f(x, coeffs, fs)
+np.seterr(all='raise')  # Treat floating-point warnings as errors
+warnings.simplefilter("error")  # Treat all Python warnings as errors
 
 
-def generate_test_function_multivariate(ip):
-    fs = [generate_test_function_univariate(c) for c in ip.components]
-    return lambda x: np.array([fi(x) for fi in fs])
+def test_smolyak_scalar():
+    print("\nTesting scalar-valued Smolyak operator (numpy) ...")
 
-
-def test_smolyak_univariate():
-
-    for g in setup.generate_pointsets(n=10, dmin=2, dmax=2):
+    for g in setup.generate_pointsets(n=10, dmin=1, dmax=4):
 
         k = sorted(np.random.randint(low=1, high=10, size=g.d))
         k /= k[0]
-        print(f"Testing with d = {g.d}, k = {k}")
-        # g.print()
+        l = np.random.randint(low=1, high=4)
+        print(f"... with k = {k}, l = {l},", g)
 
-        ip = SmolyakBarycentricInterpolator(g, k, 2)
-        f = generate_test_function_univariate(ip)
+        ip = SmolyakBarycentricInterpolator(g, k, l)
+        ff = setup.generate_test_function_smolyak(g=g, k=k, l=l, d_out=1)
+        f = lambda x : np.squeeze(ff(x))
         ip.set_F(f)
 
         for n in range(5):
-            x = g.get_random()
-            print(f"\t\t ip(x) = {ip(x)}, f(x) = {f(x)}")
-            assert np.isclose(
+            x = g.get_random(n=np.random.randint(low=0, high=5))
+            assert np.allclose(
                 ip(x), f(x)
             ), f"Assertion failed with\n x = {x}\n f(x) = {f(x)}\n ip(x) = {ip(x)}"
 
 
-def test_smolyak_multivariate():
+def test_smolyak_vector():
+    print("\nTesting vector-valued Smolyak operator (numpy) ...")
 
-    for g in setup.generate_pointsets(n=10, dmin=2, dmax=5):
+    for g in setup.generate_pointsets(n=10, dmin=1, dmax=4):
 
         k = sorted(np.random.randint(low=1, high=10, size=g.d))
         k /= k[0]
-        d2 = np.random.randint(low=1, high=5)
-        k2 = sorted(np.random.randint(low=1, high=4, size=d2), reverse=True)
-        print(f"Testing with d2 = {d2}, k2 = {k2}")
+        d_out = np.random.randint(low=1, high=5)
+        l = sorted(np.random.randint(low=1, high=4, size=d_out), reverse=True)
+        print(f"... with k = {k}, l = {np.array(l).tolist()},", g)
 
-        ip = MultivariateSmolyakBarycentricInterpolator(g=g, k=k, l=k2)
-        f = generate_test_function_multivariate(ip)
+        ip = MultivariateSmolyakBarycentricInterpolator(g=g, k=k, l=l)
+        f = setup.generate_test_function_smolyak(g=g, k=k, l=l, d_out=d_out)
         ip.set_F(f=f)
 
         for n in range(5):
-            x = g.get_random()
+            x = g.get_random(n=np.random.randint(low=0, high=5))
             print(f"\t\t ip(x) = {ip(x)}, f(x) = {f(x)}")
             assert np.allclose(
                 ip(x), f(x)
