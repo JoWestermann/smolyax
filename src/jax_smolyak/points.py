@@ -208,8 +208,9 @@ class GaussHermiteMulti(Multi):
 
     def __repr__(self):
         return (
-            f"\tGauss Hermite in d = {self.d}"
-            f"\t\t mean = {(g.m for g in self.gs)}, diagonal scaling = {(g.a for g in self.gs)}"
+            f"Gauss Hermite (d = {self.d}"
+            f", mean = {np.array([g.m for g in self.gs]).tolist()}"
+            f", scaling = {np.array([g.a for g in self.gs]).tolist()})"
         )
 
 
@@ -224,4 +225,4 @@ class LejaMulti(Multi):
             raise
 
     def __repr__(self):
-        return f"\tLeja in d = {self.d}" f"\t\t domain = {(g.domain for g in self.gs)}"
+        return f"Leja (d = {self.d}, domain = {np.array([g.domain for g in self.gs]).tolist()})"
