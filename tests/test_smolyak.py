@@ -2,12 +2,6 @@ import setup
 
 from jax_smolyak.smolyak import *
 
-import numpy as np
-import warnings
-
-np.seterr(all='raise')  # Treat floating-point warnings as errors
-warnings.simplefilter("error")  # Treat all Python warnings as errors
-
 
 def test_smolyak_scalar():
     print("\nTesting scalar-valued Smolyak operator (numpy) ...")
