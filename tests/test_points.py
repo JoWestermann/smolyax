@@ -8,4 +8,4 @@ def test_pointsets():
 
     for g in setup.generate_pointsets(n=5, dmin=2, dmax=10):
         x = g.get_random()
-        assert np.isclose(x, g.scale(g.scale_back(x))).all()
+        assert np.allclose(x, g.scale(g.scale_back(x)))

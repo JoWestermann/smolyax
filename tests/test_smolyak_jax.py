@@ -25,8 +25,6 @@ def test_smolyak_jax():
             x = g.get_random()
             y = f(x)
             y_ = ipJ(x)
-            assert np.isclose(
+            assert np.allclose(
                 y, y_
-            ).all(), (
-                f"Assertion failed with\n x = {x}\n f(x) = {y}\n ip(x) = {y_} @ n = {n}"
-            )
+            ), f"Assertion failed with\n x = {x}\n f(x) = {y}\n ip(x) = {y_} @ n = {n}"

@@ -71,9 +71,9 @@ def test_tensorproduct_interpolation():
             y_f = f(x)
             y_i = ip(x)
             assert y_f.shape == y_i.shape
-            assert np.isclose(
+            assert np.allclose(
                 y_i, y_f
-            ).all(), f"Assertion failed with\n x = {x}\n f(x) = {y_f}\n ip(x) = {y_i}"
+            ), f"Assertion failed with\n x = {x}\n f(x) = {y_f}\n ip(x) = {y_i}"
 
         print("\t ... testing random points")
         for n in range(100):
@@ -84,6 +84,6 @@ def test_tensorproduct_interpolation():
             y_f = np.array([f(xi) for xi in x])
             y_i = ip(x)
             assert y_f.shape == y_i.shape
-            assert np.isclose(
+            assert np.allclose(
                 y_i, y_f
-            ).all(), f"Assertion failed with\n x = {x}\n f(x) = {y_f}\n ip(x) = {y_i}"
+            ), f"Assertion failed with\n x = {x}\n f(x) = {y_f}\n ip(x) = {y_i}"

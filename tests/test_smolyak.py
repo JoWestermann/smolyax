@@ -63,6 +63,6 @@ def test_smolyak_multivariate():
         for n in range(5):
             x = g.get_random()
             print(f"\t\t ip(x) = {ip(x)}, f(x) = {f(x)}")
-            assert np.isclose(
+            assert np.allclose(
                 ip(x), f(x)
-            ).all(), f"Assertion failed with\n x = {x}\n f(x) = {f(x)}\n ip(x) = {ip(x)} @ n = {n}"
+            ), f"Assertion failed with\n x = {x}\n f(x) = {f(x)}\n ip(x) = {ip(x)} @ n = {n}"
