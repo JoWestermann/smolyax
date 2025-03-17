@@ -3,35 +3,33 @@ from typing import Mapping
 import numpy as np
 import cykhash
 # deprecated
-
-
-def indexset_dense(k, l, idx=None):
+def indexset_dense(k, t, idx=None):
     if idx is None:
         idx = ()
     if len(k) == 0:
         return [idx]
     r = []
     j = 0
-    while j * k[0] < l:
-        r += indexset_dense(k[1:], l - j * k[0], idx + (j,))
+    while j * k[0] < t:
+        r += indexset_dense(k[1:], t - j * k[0], idx + (j,))
         j += 1
     return r
 
 
 # deprecated
-def unitball(nu, k, l, e=None):
+def unitball(nu, k, t, e=None):
     if e is None:
         e = []
     if len(k) == 0:
         return [e]
-    r = unitball(nu[1:], k[1:], l - nu[0] * k[0], e + [0])
-    if np.dot(nu, k) + k[0] < l:
-        r += unitball(nu[1:], k[1:], l - (nu[0] + 1) * k[0], e + [1])
+    r = unitball(nu[1:], k[1:], t - nu[0] * k[0], e + [0])
+    if np.dot(nu, k) + k[0] < t:
+        r += unitball(nu[1:], k[1:], t - (nu[0] + 1) * k[0], e + [1])
     return r
 
 
-def smolyak_coefficient_zeta_dense(k, l, *, nu=None):
-    return np.sum([(-1) ** (np.sum(e)) for e in unitball(nu, k, l)])
+def smolyak_coefficient_zeta_dense(k, t, *, nu=None):
+    return np.sum([(-1) ** (np.sum(e)) for e in unitball(nu, k, t)])
 
 def indexset_sparse_w_cutoff(k, l, cutoff, i=0, idx=None):
     if idx is None:
@@ -52,21 +50,21 @@ def indexset_sparse_w_cutoff(k, l, cutoff, i=0, idx=None):
         j += 1
     return r
 
-def indexset_sparse(k, l, cutoff, i=0, idx=None):
+def indexset_sparse(k, t, i=0, idx=None, *, cutoff=None):
     if idx is None:
         idx = {}
     if cutoff is not None and i >= cutoff:
         return [idx]
     r = []
-    if (cutoff is None or i + 1 < cutoff) and k(i + 1) < l:
-        r += indexset_sparse(k, l, cutoff, i + 1, idx)
+    if (cutoff is None or i + 1 < cutoff) and k(i + 1) < t:
+        r += indexset_sparse(k, t, i + 1, idx, cutoff=cutoff)
     else:
         r += [idx]
     j = 1
-    while j * k(i) < l:
+    while j * k(i) < t:
         if i not in idx:  # Only allow `i: j` if it hasn't been assigned
             idx[i] = j  # Assign `i: j`
-            r += indexset_sparse(k, l - j * k(i), cutoff, i + 1, {**idx, i: j})
+            r += indexset_sparse(k, t - j * k(i),  i + 1, {**idx, i: j}, cutoff=cutoff)
             del idx[i]  # Restore state after recursion
         j += 1
     return r
@@ -101,20 +99,20 @@ def fast_indexset_sparse_count_w_cutoff(k, l, cutoff, i=0, idx=None):
     return count_val
 
 
-def abs_e_sparse(k, l, i=0, e=None, *, nu=None, cutoff=None):
+def abs_e_sparse(k, t, i=0, e=None, *, nu=None, cutoff=None):
     if e is None:
         assert i == 0 and nu is not None
         e = 0
-        l -= np.sum([nu[j] * k(j) for j in nu.keys()])
+        t -= np.sum([nu[j] * k(j) for j in nu.keys()])
     if cutoff is not None and i >= cutoff:
         return [e]
     r = []
-    if (cutoff is None or i + 1 < cutoff) and k(i + 1) < l:
-        r += abs_e_sparse(k, l, i + 1, e, cutoff=cutoff)
+    if (cutoff is None or i + 1 < cutoff) and k(i + 1) < t:
+        r += abs_e_sparse(k, t, i + 1, e, cutoff=cutoff)
     else:
         r += [e]
-    if k(i) < l:
-        r += abs_e_sparse(k, l - k(i), i + 1, e + 1, cutoff=cutoff)
+    if k(i) < t:
+        r += abs_e_sparse(k, t - k(i), i + 1, e + 1, cutoff=cutoff)
     return r
 
 
@@ -147,8 +145,8 @@ def count_abs_e_sparse_fast_pow_w_cutoff(k, l, cutoff, i=0, e=None, *, nu=None):
     return count_val
 
 
-def smolyak_coefficient_zeta_sparse(k, l, *, nu=None, cutoff=None) -> int:
-    return np.sum([(-1) ** e for e in abs_e_sparse(k, l, nu=nu, cutoff=cutoff)])
+def smolyak_coefficient_zeta_sparse(k, t, *, nu=None, cutoff=None) -> int:
+    return np.sum([(-1) ** e for e in abs_e_sparse(k, t, nu=nu, cutoff=cutoff)])
 
 
 def fast_smolyak_coefficient_zeta_sparse(k, l, *, nu=None, cutoff=None) -> int:
@@ -172,52 +170,55 @@ def dense_index_to_sparse(dense_nu):
     return sparse_nu
 
 
-def n_points(kmap, l, cutoff, nested: bool = False) -> int:
+def cardinality(kmap, t, cutoff, nested: bool = False) -> int:
     if nested:
-        return fast_indexset_sparse_count_w_cutoff(kmap, l, cutoff)
+        return fast_indexset_sparse_count_w_cutoff(kmap, t, cutoff)
     else:
-        iset = indexset_sparse(kmap, l, cutoff=cutoff)
+        iset = indexset_sparse(kmap, t, cutoff=cutoff)
         n = 0
         for nu in iset:
-            c = np.sum(1 - 2 * (np.array(abs_e_sparse(kmap, l, nu=nu, cutoff=cutoff)) & 1))
-            print("computed c")
+            c = np.sum(1 - 2 * (np.array(abs_e_sparse(kmap, t, nu=nu, cutoff=cutoff)) & 1))
             if c != 0:
-                print(nu.values(), "nu values")
                 n += np.prod([v + 1 for v in nu.values()])
         return n
 
 
-def find_suitable_l(k: Mapping, n: int = 50, nested: bool = False) -> int:
-    assert n > 0
+def find_suitable_t(k: Mapping, m: int = 50, nested: bool = False) -> int:
+    """
+    k : weight vector of the anisotropy of the multi-index set
+    m : target cardinality of the multi-index set
+    returns t : threshold parameter to construct a k-weighted multi-index set of size (roughly) m
+    """
+    assert m > 0
 
     def kmap(j):
         return k[j]
 
     cutoff = len(k)
 
-    if n == 1:
+    if m == 1:
         return 1
 
     # establish search interval
     l_interval = [1, 2]
-    while n_points(kmap, l_interval[0], cutoff, nested) > n:
+    while cardinality(kmap, l_interval[0], cutoff, nested) > m:
         l_interval[0] /= 1.2
-    while n_points(kmap, l_interval[1], cutoff, nested) < n:
+    while cardinality(kmap, l_interval[1], cutoff, nested) < m:
         l_interval[1] *= 1.2
 
     # bisect search interval
     def midpoint(interval):
         return interval[0] + (interval[1] - interval[0]) / 2
 
-    l_cand = midpoint(l_interval)
-    n_cand = n_points(kmap, l_cand, cutoff, nested)
+    t_cand = midpoint(l_interval)
+    m_cand = cardinality(kmap, t_cand, cutoff, nested)
     for _ in range(32):
-        if n_cand > n:
-            l_interval = [l_interval[0], l_cand]
+        if m_cand > m:
+            l_interval = [l_interval[0], t_cand]
         else:
-            l_interval = [l_cand, l_interval[1]]
-        l_cand = midpoint(l_interval)
-        n_cand = n_points(kmap, l_cand, cutoff, nested)
-        if n_cand == n:
+            l_interval = [t_cand, l_interval[1]]
+        t_cand = midpoint(l_interval)
+        m_cand = cardinality(kmap, t_cand, cutoff, nested)
+        if m_cand == m:
             break
-    return l_cand
+    return t_cand

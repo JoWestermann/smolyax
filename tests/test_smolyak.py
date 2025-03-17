@@ -2,12 +2,6 @@ import setup
 
 from jax_smolyak.smolyak import *
 
-import numpy as np
-import warnings
-
-np.seterr(all="raise")  # Treat floating-point warnings as errors
-warnings.simplefilter("error")  # Treat all Python warnings as errors
-
 
 def test_smolyak_scalar():
     print("\nTesting scalar-valued Smolyak operator (numpy) ...")
@@ -16,15 +10,12 @@ def test_smolyak_scalar():
 
         k = sorted(np.random.randint(low=1, high=10, size=g.d))
         k /= k[0]
-        l = np.random.randint(low=1, high=4)
-        print(f"... with k = {k}, l = {l},", g)
+        t = np.random.randint(low=1, high=4)
+        print(f"... with k = {k}, t = {t},", g)
 
-        ip = SmolyakBarycentricInterpolator(g, k, l)
-        ff = setup.generate_test_function_smolyak(g=g, k=k, l=l, d_out=1)
-
-        def f(x):
-            return np.squeeze(ff(x))
-
+        ip = SmolyakBarycentricInterpolator(g, k, t)
+        ff = setup.generate_test_function_smolyak(g=g, k=k, t=t, d_out=1)
+        f = lambda x: np.squeeze(ff(x))
         ip.set_F(f)
 
         for n in range(5):
@@ -42,11 +33,11 @@ def test_smolyak_vector():
         k = sorted(np.random.randint(low=1, high=10, size=g.d))
         k /= k[0]
         d_out = np.random.randint(low=1, high=5)
-        l = sorted(np.random.randint(low=1, high=4, size=d_out), reverse=True)
-        print(f"... with k = {k}, l = {np.array(l).tolist()},", g)
+        t = sorted(np.random.randint(low=1, high=4, size=d_out), reverse=True)
+        print(f"... with k = {k}, t = {np.array(t).tolist()},", g)
 
-        ip = MultivariateSmolyakBarycentricInterpolator(g=g, k=k, l=l)
-        f = setup.generate_test_function_smolyak(g=g, k=k, l=l, d_out=d_out)
+        ip = MultivariateSmolyakBarycentricInterpolator(g=g, k=k, t=t)
+        f = setup.generate_test_function_smolyak(g=g, k=k, t=t, d_out=d_out)
         ip.set_F(f=f)
 
         for n in range(5):

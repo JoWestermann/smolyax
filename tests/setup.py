@@ -60,14 +60,14 @@ def generate_test_function_tensorproduct(*, g, nu):
     return lambda x: evaluate_multivariate_polynomial(g, nu, x)
 
 
-def generate_test_function_smolyak(*, g, k, l, d_out):
-    if np.isscalar(l):
-        l = [l] * d_out
-    assert len(l) == d_out
+def generate_test_function_smolyak(*, g, k, t, d_out):
+    if np.isscalar(t):
+        t = [t] * d_out
+    assert len(t) == d_out
 
     selected_idxs = []
-    for li in l:
-        idxs = indices.indexset_sparse(lambda j: k[j], li, cutoff=len(k))
+    for ti in t:
+        idxs = indices.indexset_sparse(lambda j: k[j], ti, cutoff=len(k))
         j = np.random.randint(len(idxs))
         selected_idxs.append(indices.sparse_index_to_dense(idxs[j], cutoff=len(k)))
     print("\t Test polynomials with degrees", selected_idxs)
