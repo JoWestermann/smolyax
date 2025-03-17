@@ -68,7 +68,7 @@ def test_smolyak_coefficients():
         k, l, isparse, idense = get_random_indexsets(nested=(i % 2) == 0)
 
         for nu_1, nu_2 in zip(isparse, idense):
-            c_1 = smolyak_coefficient_zeta_sparse(
+            c_1 = fast_smolyak_coefficient_zeta_sparse(
                 lambda j: k[j], l, nu=nu_1, cutoff=len(k)
             )
             c_2 = smolyak_coefficient_zeta_dense(k, l, nu=nu_2)
