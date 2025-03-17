@@ -33,7 +33,7 @@ def __evaluate_tensorproduct_interpolant(
 def _create_evaluate_tensorproduct_interpolant_for_vmap(n: int):
     def wrapped_function(x, F, *args):
         xi_list = args[:n]
-        w_list = args[n:2 * n]
+        w_list = args[n : 2 * n]
         s_list = args[2 * n]
         return __evaluate_tensorproduct_interpolant(x, F, xi_list, w_list, s_list)
 
@@ -99,7 +99,9 @@ class MultivariateSmolyakBarycentricInterpolator:
             if n not in self.data:
                 self.data[n] = {}
             self.data[n]["z"] = jnp.array(self.n_2_zetas[n])
-            self.data[n]["F"] = np.zeros((nn, d_out) + tuple(tau_i + 1 for tau_i in tau))
+            self.data[n]["F"] = np.zeros(
+                (nn, d_out) + tuple(tau_i + 1 for tau_i in tau)
+            )
             self.data[n]["xi"] = [np.zeros((nn, tau_i + 1)) for tau_i in tau]
             self.data[n]["w"] = [np.zeros((nn, tau_i + 1)) for tau_i in tau]
             self.data[n]["s"] = np.zeros((nn, n), dtype=int)
