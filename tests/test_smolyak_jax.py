@@ -1,7 +1,7 @@
 import numpy as np
 import setup
 
-from jax_smolyak.smolyak_jax import MultivariateSmolyakBarycentricInterpolator as Smol
+from jax_smolyak.smolyak_jax import MultivariateSmolyakBarycentricInterpolator
 
 
 def test_smolyak_jax():
@@ -17,7 +17,9 @@ def test_smolyak_jax():
 
         f = setup.generate_test_function_smolyak(g=g, k=k, t=t, d_out=d_out)
 
-        ip = Smol(g=g, k=k, t=t, d_out=d_out, batchsize=1, f=f)
+        ip = MultivariateSmolyakBarycentricInterpolator(
+            g=g, k=k, t=t, d_out=d_out, batchsize=1, f=f
+        )
 
         for n in range(5):
             x = g.get_random(n=np.random.randint(low=0, high=5))

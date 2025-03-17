@@ -1,8 +1,6 @@
 import numpy as np
 import setup
 
-from jax_smolyak.points import *
-
 
 def test_pointsets():
 

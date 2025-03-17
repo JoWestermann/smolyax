@@ -1,6 +1,5 @@
-from typing import Mapping
-
 import numpy as np
+from numpy.typing import ArrayLike
 
 
 # deprecated
@@ -29,28 +28,31 @@ def unitball(nu, k, t, e=None):
     return r
 
 
-def smolyak_coefficient_zeta_dense(k, t, *, nu=None):
+# deprecated
+def smolyak_coefficient_zeta_dense(k, t, *, nu):
     return np.sum([(-1) ** (np.sum(e)) for e in unitball(nu, k, t)])
 
 
-def indexset_sparse(k, t, i=0, idx=None, *, cutoff=None):
-    if idx is None:
-        idx = {}
+def indexset_sparse(
+    k, t: float, i: int = 0, nu: dict[int, int] = None, *, cutoff: int = None
+):
+    if nu is None:
+        nu = {}
     if cutoff is not None and i >= cutoff:
-        return [idx]
+        return [nu]
     r = []
     if (cutoff is None or i + 1 < cutoff) and k(i + 1) < t:
-        r += indexset_sparse(k, t, i + 1, idx, cutoff=cutoff)
+        r += indexset_sparse(k, t, i + 1, nu, cutoff=cutoff)
     else:
-        r += [idx]
+        r += [nu]
     j = 1
     while j * k(i) < t:
-        r += indexset_sparse(k, t - j * k(i), i + 1, {**idx, i: j}, cutoff=cutoff)
+        r += indexset_sparse(k, t - j * k(i), i + 1, {**nu, i: j}, cutoff=cutoff)
         j += 1
     return r
 
 
-def abs_e_sparse(k, t, i=0, e=None, *, nu=None, cutoff=None):
+def abs_e_sparse(k, t, i=0, e=None, *, nu: dict[int, int] = None, cutoff: int = None):
     if e is None:
         assert i == 0 and nu is not None
         e = 0
@@ -67,11 +69,13 @@ def abs_e_sparse(k, t, i=0, e=None, *, nu=None, cutoff=None):
     return r
 
 
-def smolyak_coefficient_zeta_sparse(k, t, *, nu=None, cutoff=None):
+def smolyak_coefficient_zeta_sparse(
+    k, t: float, *, nu: dict[int, int] = None, cutoff: int = None
+):
     return np.sum([(-1) ** e for e in abs_e_sparse(k, t, nu=nu, cutoff=cutoff)])
 
 
-def sparse_index_to_dense(nu, cutoff=None) -> tuple:
+def sparse_index_to_dense(nu: dict[int, int], cutoff: int = None) -> tuple:
     if cutoff is None:
         cutoff = max(nu.keys())
     dense_nu = [0] * cutoff
@@ -80,7 +84,7 @@ def sparse_index_to_dense(nu, cutoff=None) -> tuple:
     return tuple(dense_nu)
 
 
-def dense_index_to_sparse(dense_nu):
+def dense_index_to_sparse(dense_nu: ArrayLike) -> dict[int, int]:
     sparse_nu = {}
     for k, v in enumerate(dense_nu):
         if v > 0:
@@ -88,7 +92,7 @@ def dense_index_to_sparse(dense_nu):
     return sparse_nu
 
 
-def cardinality(kmap, t, cutoff, nested: bool = False) -> int:
+def cardinality(kmap, t: float, cutoff: int, nested: bool = False) -> int:
     iset = indexset_sparse(kmap, t, cutoff=cutoff)
 
     if nested:
@@ -102,7 +106,7 @@ def cardinality(kmap, t, cutoff, nested: bool = False) -> int:
     return n
 
 
-def find_suitable_t(k: Mapping, m: int = 50, nested: bool = False) -> int:
+def find_suitable_t(k: ArrayLike, m: int = 50, nested: bool = False) -> int:
     """
     k : weight vector of the anisotropy of the multi-index set
     m : target cardinality of the multi-index set

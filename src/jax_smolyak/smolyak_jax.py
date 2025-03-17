@@ -33,7 +33,7 @@ def __evaluate_tensorproduct_interpolant(
 def _create_evaluate_tensorproduct_interpolant_for_vmap(n: int):
     def wrapped_function(x, F, *args):
         xi_list = args[:n]
-        w_list = args[n : 2 * n]
+        w_list = args[n: 2 * n]
         s_list = args[2 * n]
         return __evaluate_tensorproduct_interpolant(x, F, xi_list, w_list, s_list)
 
@@ -57,7 +57,7 @@ class MultivariateSmolyakBarycentricInterpolator:
         """
         self.d = len(k)
         self.d_out = d_out
-        self._is_nested = g._is_nested
+        self._is_nested = g.is_nested
 
         # Compute coefficients and multi-indices of the Smolyak Operator
         zetas = []
@@ -195,7 +195,7 @@ class MultivariateSmolyakBarycentricInterpolator:
             )
         _ = self(np.random.random((batchsize, self.d)))
 
-    def __call__(self, x: ArrayLike):
+    def __call__(self, x: ArrayLike) -> ArrayLike:
         assert bool(self.__compiledfuncs) == bool(
             self.data
         ), "The operator has not yet been compiled for a target function."

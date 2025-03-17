@@ -7,17 +7,18 @@ from numpy.typing import ArrayLike
 class Points(ABC):
     """Abstract base class for interpolation points"""
 
+    def __init__(self, is_nested: bool) -> None:
+        self._is_nested = is_nested
+
     @property
-    @abstractmethod
-    def is_nested(self) -> bool: ...
+    def is_nested(self) -> bool:
+        return self._is_nested
 
     @abstractmethod
-    def __call__(self, n: int): ...
+    def __call__(self, n: int) -> ArrayLike: ...
 
     @abstractmethod
-    def scale(
-        self, x: ArrayLike, m: ArrayLike = None, a: ArrayLike = None
-    ) -> ArrayLike: ...
+    def scale(self, x: ArrayLike) -> ArrayLike: ...
 
     @abstractmethod
     def scale_back(self, x: ArrayLike) -> ArrayLike: ...
@@ -32,37 +33,23 @@ class Points(ABC):
 class GaussHermite(Points):
     """Gauss-Hermite grid points"""
 
-    def is_nested(self) -> bool:
-        return self._is_nested
-
-    _is_nested = False
-
-    def __init__(self, m: ArrayLike, a: ArrayLike) -> None:
+    def __init__(self, m: float, a: float) -> None:
+        super().__init__(is_nested=False)
         self.m = m  # mean
         self.a = a  # scaling
 
     def __repr__(self):
-        return f"Gauss-Hermite" f"\t\t mean = {self.m}, diagonal scaling = {self.a}"
+        return f"Gauss-Hermite (mean = {self.m}, scaling = {self.a})"
 
     def __call__(self, n: int) -> ArrayLike:
         nodes = np.polynomial.hermite.hermgauss(n + 1)[0]
-        return self.scale(nodes, self.m, self.a)
+        return self.scale(nodes)
 
-    def scale(
-        self, x: ArrayLike, m: ArrayLike = None, a: ArrayLike = None
-    ) -> ArrayLike:
+    def scale(self, x: ArrayLike) -> ArrayLike:
         """
         Affine transformation x -> m + a * x
-        x : array of shape (n, d) or (d,)
-        m : scalar or array of shape (d,)
-        a : positive scalar or array of shape (d,)
         """
-        if m is None:
-            m = self.m
-        if a is None:
-            a = self.a
-        assert a > 0
-        return m + a * x
+        return self.m + self.a * x
 
     def scale_back(self, x: ArrayLike) -> ArrayLike:
         return (x - self.m) / self.a
@@ -74,21 +61,18 @@ class GaussHermite(Points):
 class Leja(Points):
     """Leja grid points"""
 
-    def is_nested(self) -> bool:
-        return self._is_nested
-
     nodes = np.array([0, 1, -1, 1 / np.sqrt(2), -1 / np.sqrt(2)])
-    _is_nested = True
     _default_domain = [-1, 1]
 
-    def __init__(self, domain=None) -> None:
+    def __init__(self, domain: ArrayLike = None) -> None:
+        super().__init__(is_nested=True)
         self.domain = domain
 
     def __repr__(self):
-        return f"Leja" f"\t\t domain = {self.domain}"
+        return f"Leja (domain = {self.domain})"
 
     @classmethod
-    def ensure_nodes(cls, n):
+    def _ensure_nodes(cls, n: int):
         k = cls.nodes.shape[0]
         if n >= k:
             cls.nodes = np.append(cls.nodes, np.empty((n + 1 - k,)))
@@ -98,8 +82,8 @@ class Leja(Points):
                 else:
                     cls.nodes[j] = np.sqrt((cls.nodes[int((j + 1) / 2)] + 1) / 2)
 
-    def __call__(self, n: int) -> float:
-        self.ensure_nodes(n)
+    def __call__(self, n: int) -> ArrayLike:
+        self._ensure_nodes(n)
         if self.domain is None:
             return self.nodes[: n + 1]
         return self.scale(self.nodes[: n + 1], self._default_domain, self.domain)
@@ -109,8 +93,8 @@ class Leja(Points):
     ) -> ArrayLike:
         """
         Affine transformation from the interval d1 to the interval d2 applied to point x.
-        x : scalar or array or list of shape (n, d) or (d,)
-        d1, d2 : arrays or lists of shape (d, 2) or (2,)
+        x : scalar or array or list of shape (n, d) or (d, )
+        d1, d2 : arrays or lists of shape (d, 2) or (2, )
         """
         if d1 is None:
             d1 = self._default_domain
@@ -173,40 +157,43 @@ class Leja(Points):
         return np.random.uniform(self.domain[0], self.domain[1])
 
 
-class Multi:
-    @property
-    def is_nested(self) -> bool:
-        return self._is_nested
+class Multi(Points):
 
     def __init__(self, gs):
+        super().__init__(is_nested=gs[0].is_nested)
         self.gs = gs
         self.d = len(self.gs)
-        self._is_nested = gs[0]._is_nested
 
-    def __getitem__(self, i):
+    def __call__(self, n: int) -> ArrayLike:
+        raise
+
+    def __getitem__(self, i: int):
         return self.gs[i]
 
-    def get_zero(self):
+    def get_zero(self) -> ArrayLike:
         return np.array([g(0)[0] for g in self.gs])
 
-    def get_random(self, n=0):
+    def get_random(self, n: int = 0) -> ArrayLike:
         if n == 0:
             return np.array([g.get_random() for g in self.gs])
         return np.array([[g.get_random() for g in self.gs] for _ in range(n)])
 
-    def scale(self, x):
+    def scale(self, x: ArrayLike) -> ArrayLike:
         return np.array([g.scale(xi) for g, xi in zip(self.gs, x)])
 
-    def scale_back(self, x):
+    def scale_back(self, x: ArrayLike) -> ArrayLike:
         return np.array([g.scale_back(xi) for g, xi in zip(self.gs, x)])
+
+    @abstractmethod
+    def __repr__(self) -> str: ...
 
 
 class GaussHermiteMulti(Multi):
 
-    def __init__(self, mlist, alist):
+    def __init__(self, mlist: ArrayLike, alist: ArrayLike):
         Multi.__init__(self, [GaussHermite(m, a) for m, a in zip(mlist, alist)])
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"Gauss Hermite (d = {self.d}"
             f", mean = {np.array([g.m for g in self.gs]).tolist()}"
@@ -216,7 +203,7 @@ class GaussHermiteMulti(Multi):
 
 class LejaMulti(Multi):
 
-    def __init__(self, *, domains=None, d=None):
+    def __init__(self, *, domains: ArrayLike = None, d: int = None):
         if domains is not None:
             Multi.__init__(self, [Leja(domain) for domain in domains])
         elif d is not None:
@@ -224,5 +211,5 @@ class LejaMulti(Multi):
         else:
             raise
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Leja (d = {self.d}, domain = {np.array([g.domain for g in self.gs]).tolist()})"

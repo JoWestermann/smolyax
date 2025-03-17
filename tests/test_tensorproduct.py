@@ -1,6 +1,10 @@
+import itertools as it
+
+import numpy as np
 import setup
 
-from jax_smolyak.tensorproduct import *
+from jax_smolyak import indices
+from jax_smolyak.tensorproduct import TensorProductBarycentricInterpolator
 
 
 def test_tensorproduct_interpolation():

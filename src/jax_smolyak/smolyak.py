@@ -2,6 +2,7 @@ import itertools as it
 from typing import Callable
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 from . import indices
 from .tensorproduct import TensorProductBarycentricInterpolator
@@ -13,11 +14,11 @@ class SmolyakBarycentricInterpolator:
     def is_nested(self) -> bool:
         return self._is_nested
 
-    def __init__(self, g, k, t, f=None):
+    def __init__(self, g, k: ArrayLike, t: float, f: Callable = None):
         self.k = k
         self.operators = []
         self.coefficients = []
-        self._is_nested = g._is_nested
+        self._is_nested = g.is_nested
 
         def kmap(j):
             return k[j]
@@ -38,7 +39,7 @@ class SmolyakBarycentricInterpolator:
         if f is not None:
             self.set_F(f)
 
-    def set_F(self, f: Callable, F: dict = None, i=None):
+    def set_F(self, f: Callable, F: dict = None, i: int = None):
         if F is None:
             F = {}
         if self.is_nested:
@@ -71,30 +72,23 @@ class SmolyakBarycentricInterpolator:
                 F[o.degrees] = Fo
         return F
 
-    def __call__(self, x):
+    def __call__(self, x: ArrayLike) -> ArrayLike:
         r = 0
         for c, o in zip(self.coefficients, self.operators):
             r += c * o(x)
         return r
 
-    def get_max_degrees(self):
-        max_degrees = list(self.operators[0].degrees)
-        for o in self.operators[1:]:
-            for i in range(len(max_degrees)):
-                max_degrees[i] = max(o.degrees[i], max_degrees[i])
-        return max_degrees
-
 
 class MultivariateSmolyakBarycentricInterpolator:
 
-    def __init__(self, *, g, k, t, f=None):
+    def __init__(self, *, g, k: ArrayLike, t: ArrayLike, f: Callable = None):
         self.components = [SmolyakBarycentricInterpolator(g, k, ti) for ti in t]
         self.n = max(c.n for c in self.components)
         self.F = None
         if f is not None:
             self.set_F(f=f)
 
-    def set_F(self, *, f, F=None):
+    def set_F(self, *, f: Callable, F=None):
         assert self.F is None
         if F is None:
             F = {}
@@ -104,13 +98,7 @@ class MultivariateSmolyakBarycentricInterpolator:
 
         return F
 
-    def __call__(self, x):
+    def __call__(self, x: ArrayLike) -> ArrayLike:
         res = np.array([c(x) for c in self.components]).T
         assert res.shape[res.ndim - 1] == len(self.components)
         return res
-
-    def print(self):
-        for i, c in enumerate(self.components):
-            print("i = {}".format(i))
-            for o in c.operators:
-                print("\t", o.degrees)

@@ -1,6 +1,8 @@
 import itertools as it
+from typing import Callable
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 from . import indices
 
@@ -14,7 +16,8 @@ class TensorProductBarycentricInterpolator:
     (https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=9da00c0aedf5335927147df78eb5f6767edba968).
     """
 
-    def __init__(self, gens, degrees, d, f=None):
+    def __init__(self, gens, degrees, d: int, f: Callable = None):
+        self.degrees = indices.sparse_index_to_dense(degrees, d)
         self.gens = gens
         self.adims = list(degrees.keys())
         self.nodes = [gens[i](k) for i, k in degrees.items()]
@@ -24,7 +27,6 @@ class TensorProductBarycentricInterpolator:
             )
             for nodes in self.nodes
         ]
-        self.degrees = indices.sparse_index_to_dense(degrees, d)
         self.x = gens.get_zero()
         # F is the array containing evaluations of the target f
         # NOTE: For efficiency, we index only dimensions that have a degree larger than 0.
@@ -37,13 +39,13 @@ class TensorProductBarycentricInterpolator:
         for o, i in zip(self.ordering, ridx):
             self.x[self.adims[o]] = self.nodes[o][i]
 
-    def set_F(self, f):
+    def set_F(self, f: Callable):
         """Evaluate the target function f at all interpolation nodes"""
         for ridx in it.product(*(range(d) for d in self.F.shape)):
             self.set_x(ridx)
             self.F[ridx] = f(self.x)
 
-    def reduced_index(self, idx):
+    def reduced_index(self, idx: ArrayLike):
         return tuple(idx[self.adims[o]] for o in self.ordering)
 
     def __call__(self, x):
