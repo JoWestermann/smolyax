@@ -13,7 +13,7 @@ def get_random_indexsets(nested=False):
     k = np.log([a + b * i for i in range(d)]) / np.log(a)
 
     n_t = np.random.randint(low=1, high=100)
-    l = find_suitable_l(k, n_t, nested=nested)
+    l = find_suitable_t(k, n_t, nested=nested)
 
     isparse = indexset_sparse(lambda j: k[j], l, cutoff=d)
     idense = indexset_dense(k, l)

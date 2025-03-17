@@ -12,12 +12,12 @@ def test_smolyak_jax():
         k = sorted(np.random.randint(low=1, high=10, size=g.d))
         k /= k[0]
         d_out = np.random.randint(low=1, high=4)
-        l = np.random.randint(low=1, high=4)
-        print(f"... with k = {k}, l = {l}, d_out = {d_out},", g)
+        t = np.random.randint(low=1, high=4)
+        print(f"... with k = {k}, t = {t}, d_out = {d_out},", g)
 
-        f = setup.generate_test_function_smolyak(g=g, k=k, l=l, d_out=d_out)
+        f = setup.generate_test_function_smolyak(g=g, k=k, t=t, d_out=d_out)
 
-        ip = Smol(g=g, k=k, l=l, rank=d_out, batchsize=1, f=f)
+        ip = Smol(g=g, k=k, t=t, d_out=d_out, batchsize=1, f=f)
 
         for n in range(5):
             x = g.get_random(n=np.random.randint(low=0, high=5))

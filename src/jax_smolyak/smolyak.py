@@ -13,7 +13,7 @@ class SmolyakBarycentricInterpolator:
     def is_nested(self) -> bool:
         return self._is_nested
 
-    def __init__(self, g, k, l, f=None):
+    def __init__(self, g, k, t, f=None):
         self.k = k
         self.operators = []
         self.coefficients = []
@@ -22,9 +22,9 @@ class SmolyakBarycentricInterpolator:
         def kmap(j):
             return k[j]
 
-        i = indices.indexset_sparse(kmap, l, cutoff=len(k))
+        i = indices.indexset_sparse(kmap, t, cutoff=len(k))
         for nu in i:
-            c = indices.smolyak_coefficient_zeta_sparse(kmap, l, nu=nu, cutoff=len(k))
+            c = indices.smolyak_coefficient_zeta_sparse(kmap, t, nu=nu, cutoff=len(k))
             if c != 0:
                 self.operators.append(
                     TensorProductBarycentricInterpolator(g, nu, len(k))
@@ -87,8 +87,8 @@ class SmolyakBarycentricInterpolator:
 
 class MultivariateSmolyakBarycentricInterpolator:
 
-    def __init__(self, *, g, k, l, f=None):
-        self.components = [SmolyakBarycentricInterpolator(g, k, li) for li in l]
+    def __init__(self, *, g, k, t, f=None):
+        self.components = [SmolyakBarycentricInterpolator(g, k, ti) for ti in t]
         self.n = max(c.n for c in self.components)
         self.F = None
         if f is not None:
