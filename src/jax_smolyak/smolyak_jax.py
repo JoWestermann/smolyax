@@ -110,21 +110,22 @@ class MultivariateSmolyakBarycentricInterpolator:
             self.data[n]["s"] = np.zeros((nn, n), dtype=int)
 
             for i, nu in enumerate(self.n_2_lambda_n[n]):
-                adims = list(nu.keys())  # active dimensions
-                ordering = sorted(
-                    range(n), key=lambda i: list(nu.values())[i], reverse=True
-                )
+                ordered_dims = sorted(nu, key=nu.get, reverse=True)
+                self.data[n]["s"][i] = ordered_dims
 
-                self.data[n]["s"][i] = [adims[o] for o in ordering]
+                # #can we do all of this all at once? we are just placing components of g into xi and computing w...
+                for t, dim in enumerate(ordered_dims):
+                    nodes = g[dim](nu[dim])  # Get nodes in a vectorized way
+                    num_nodes = len(nodes)  # Number of nodes
 
-                for t, o in enumerate(ordering):
-                    dim = adims[o]
-                    nodes = g[dim](nu[dim])
-                    self.data[n]["xi"][t][i][: len(nodes)] = nodes
-                    self.data[n]["w"][t][i][: len(nodes)] = [
-                        1 / np.prod([nj - nk for nk in nodes if nk != nj])
-                        for nj in nodes
-                    ]
+                    # Set values in xi directly using slicing
+                    self.data[n]["xi"][t][i, :num_nodes] = nodes
+
+                    # Compute weights using NumPy broadcasting instead of list comprehension
+                    nodes_array = np.array(nodes)  # Convert to NumPy array for broadcasting
+                    diffs = nodes_array[:, None] - nodes_array  # Compute all pairwise differences
+                    np.fill_diagonal(diffs, 1)  # Avoid division by zero on the diagonal
+                    self.data[n]["w"][t][i, :num_nodes] = 1 / np.prod(diffs, axis=1)  # Compute weights
 
         # Other variables, info, etc
         self.zero = g.get_zero()
