@@ -1,14 +1,14 @@
-import numpy
+import numpy as np
 
 from jax_smolyak.points import *
 
 
-def generate_pointsets(n, dmax):
+def generate_pointsets(*, n, dmin, dmax):
 
     sets = []
     for _ in range(n):
 
-        d = np.random.randint(low=2, high=dmax)
+        d = np.random.randint(low=dmin, high=dmax+1)
 
         m = np.random.randn(d)
         a = np.random.rand(d)

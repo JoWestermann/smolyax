@@ -54,7 +54,7 @@ def generate_test_function(ip, n=1):
 
 def test_tensorproduct_interpolation():
 
-    for g in setup.generate_pointsets(10, 5):
+    for g in setup.generate_pointsets(n=10, dmin=2, dmax=4):
         k = np.random.randint(low=1, high=7, size=g.d)
 
         print("Testing with d = {}, k = {}".format(g.d, k))

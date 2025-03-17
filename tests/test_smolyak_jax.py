@@ -8,7 +8,7 @@ from jax_smolyak.smolyak_jax import MultivariateSmolyakBarycentricInterpolator a
 
 def test_smolyak_jax():
 
-    for g in setup.generate_pointsets(10, 3):
+    for g in setup.generate_pointsets(n=10, dmin=2, dmax=2):
 
         k = sorted(np.random.randint(low=1, high=10, size=g.d))
         k /= k[0]

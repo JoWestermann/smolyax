@@ -27,7 +27,7 @@ def generate_test_function_multivariate(ip):
 
 def test_smolyak_univariate():
 
-    for g in setup.generate_pointsets(10, 3):
+    for g in setup.generate_pointsets(n=10, dmin=2, dmax=2):
 
         k = sorted(np.random.randint(low=1, high=10, size=g.d))
         k /= k[0]
@@ -48,7 +48,7 @@ def test_smolyak_univariate():
 
 def test_smolyak_multivariate():
 
-    for g in setup.generate_pointsets(10, 5):
+    for g in setup.generate_pointsets(n=10, dmin=2, dmax=5):
 
         k = sorted(np.random.randint(low=1, high=10, size=g.d))
         k /= k[0]
