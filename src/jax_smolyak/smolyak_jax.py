@@ -33,7 +33,7 @@ def __evaluate_tensorproduct_interpolant(
 def _create_evaluate_tensorproduct_interpolant_for_vmap(n: int):
     def wrapped_function(x, F, *args):
         xi_list = args[:n]
-        w_list = args[n: 2 * n]
+        w_list = args[n : 2 * n]
         s_list = args[2 * n]
         return __evaluate_tensorproduct_interpolant(x, F, xi_list, w_list, s_list)
 
