@@ -7,7 +7,9 @@ def test_tensorproduct_interpolation():
     for g in setup.generate_pointsets(n=10, dmin=1, dmax=4):
         nu = np.random.randint(low=1, high=10, size=g.d)
         f = setup.generate_test_function_tensorproduct(g=g, nu=nu)
-        ip = TensorProductBarycentricInterpolator(g, indices.dense_index_to_sparse(nu), g.d, f)
+        ip = TensorProductBarycentricInterpolator(
+            g, indices.dense_index_to_sparse(nu), g.d, f
+        )
 
         print(f"Testing with nu = {nu},", g)
         print("\t ... testing interpolation points")
