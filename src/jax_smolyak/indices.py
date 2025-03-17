@@ -104,7 +104,7 @@ def cardinality(kmap, t, cutoff, nested: bool = False) -> int:
 
 def find_suitable_t(k: Mapping, m: int = 50, nested: bool = False) -> int:
     """
-    k : weight vector of the anisotropy of the multi-index set 
+    k : weight vector of the anisotropy of the multi-index set
     m : target cardinality of the multi-index set
     returns t : threshold parameter to construct a k-weighted multi-index set of size (roughly) m
     """
