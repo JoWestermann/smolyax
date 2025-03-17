@@ -1,8 +1,8 @@
 import numpy as np
-from numpy.polynomial.legendre import legval
 from numpy.polynomial.hermite import hermval
+from numpy.polynomial.legendre import legval
 
-from jax_smolyak import points, indices
+from jax_smolyak import indices, points
 
 
 def generate_pointsets(*, n, dmin, dmax):

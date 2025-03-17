@@ -1,7 +1,7 @@
 from typing import Mapping
 
-import numpy as np
 import cykhash
+import numpy as np
 
 
 # deprecated
@@ -122,6 +122,34 @@ def abs_e_sparse(k, t, i=0, e=None, *, nu=None, cutoff=None):
         r += abs_e_sparse(k, t - k(i), i + 1, e + 1, cutoff=cutoff)
     return r
 
+def abs_e_sparse_sum(k, t, cutoff):
+    """Computes sum((-1)^e) inline, correctly including all values of e."""
+    stack = [(0, t, 0)]  # Stack holds (i, remaining t, e)
+    result_sum = 0  # Accumulates sum((-1)^e)
+
+    while stack:
+        i, t_rem, e = stack.pop()
+
+        # Ensure we count *every* valid `e`, even when `e=0`
+        if i >= cutoff or t_rem <= 0:
+            result_sum += (1 - 2 * (e & 1))
+            continue
+
+        k_i = k(i)  # Avoid redundant function calls
+
+        # Case 1: Include k(i) in the sum if it's valid
+        if k_i < t_rem:
+            stack.append((i + 1, t_rem - k_i, e + 1))  # Increment `e`
+
+        # Case 2: Skip k(i) and move to the next index
+        stack.append((i + 1, t_rem, e))  # Keep `e` the same
+
+    return result_sum
+
+def cardinality_of_multiindex(k, t, nu, cutoff):
+    """Handles `nu` initialization and calls the optimized sum computation."""
+    t -= np.sum(nu[j] * k(j) for j in nu.keys())  # Apply `nu` adjustment
+    return abs_e_sparse_sum(k, t, cutoff)  # Directly compute sum inline
 
 def count_abs_e_sparse_fast_pow_w_cutoff(k, t, cutoff, i=0, e=None, *, nu=None) -> int:
     """Optimized version of abs_e_sparse applying `& 1` inline."""
@@ -141,7 +169,7 @@ def count_abs_e_sparse_fast_pow_w_cutoff(k, t, cutoff, i=0, e=None, *, nu=None) 
 
     else:
         count_val += 1 - 2 * (e & 1)  # Inline computation of (-1)^e
-
+    
     # Case 2: Include k(i) and recurse
     k_i = k(i)
     if k_i < t:
@@ -181,15 +209,12 @@ def cardinality(kmap, t, cutoff, nested: bool = False) -> int:
     if nested:
         return fast_indexset_sparse_count_w_cutoff(kmap, t, cutoff)
     else:
-        iset = indexset_sparse(kmap, t, cutoff=cutoff)
-        n = 0
-        for nu in iset:
-            c = np.sum(
-                1 - 2 * (np.array(abs_e_sparse(kmap, t, nu=nu, cutoff=cutoff)) & 1)
-            )
-            if c != 0:
-                n += np.prod([v + 1 for v in nu.values()])
-        return n
+        indices = indexset_sparse(kmap, t, cutoff=cutoff)
+        cardinalities = [
+            np.prod([v + 1 for v in nu.values()])
+            for nu in indices if cardinality_of_multiindex(kmap, t, nu, cutoff) != 0
+        ]
+        return np.sum(cardinalities, dtype=np.int64)
 
 
 def find_suitable_t(k: Mapping, m: int = 50, nested: bool = False) -> int:
