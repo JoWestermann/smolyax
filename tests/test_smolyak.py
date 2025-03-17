@@ -21,7 +21,7 @@ def test_smolyak_scalar():
 
         ip = SmolyakBarycentricInterpolator(g, k, l)
         ff = setup.generate_test_function_smolyak(g=g, k=k, l=l, d_out=1)
-        f = lambda x : np.squeeze(ff(x))
+        def f(x): return np.squeeze(ff(x))
         ip.set_F(f)
 
         for n in range(5):

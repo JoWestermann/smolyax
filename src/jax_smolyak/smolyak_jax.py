@@ -156,24 +156,28 @@ class MultivariateSmolyakBarycentricInterpolator:
                 x = copy.deepcopy(self.zero)
 
                 data_l_t_i = data_l_t[i]
-                #should store ridx as well!, data[l][t_inv]
+                # should store ridx as well!, data[l][t_inv]
                 data_l_f_i = data_l["F"][i]
 
                 if self.is_nested:
                     Fo = F
                 else:
                     Fo = F.get(degrees, {})
-                print(len(Fo.keys()),"fo.keys length")
-                for idx in it.product(*(range(d + 1) for d in degrees)): #can we loop not through all indices, but only 
-                    ridx = tuple(idx[j] for j in data_l_t_i) #ridx can be known a prior as a function of data_l_t_i and a sparse idx 
-                    # print(idx, data_l_t_i, (tuple(ridx))) #t = 1235 maps to the same ridx as t=1234, the key here is that one can construct it without explicit access to 0's (0's can be implicit
-                    
+                print(len(Fo.keys()), "fo.keys length")
+                for idx in it.product(*(range(d + 1)
+                                      for d in degrees)):  # can we loop not through all indices, but only
+                    # ridx can be known a prior as a function of data_l_t_i and a sparse idx
+                    ridx = tuple(idx[j] for j in data_l_t_i)
+                    # print(idx, data_l_t_i, (tuple(ridx))) #t = 1235 maps to the same ridx as
+                    # t=1234, the key here is that one can construct it without explicit
+                    # access to 0's (0's can be implicit
+
                     if idx not in Fo.keys():
                         for k, (dim, deg) in enumerate(zip(data_l_t_i, ridx)):
                             x[dim] = data_l_n[k][i][deg]
                         Fo[idx] = f(x)
                         self.n_f_evals += 1
-                    data_l_f_i[:, *ridx] = Fo[idx] #idx can be sparse,rather than dense! 
+                    data_l_f_i[:, *ridx] = Fo[idx]  # idx can be sparse,rather than dense!
                 if not self.is_nested:
                     F[degrees] = Fo
             # cast to jnp data structures

@@ -53,7 +53,7 @@ def indexset_sparse(k, l, i=0, idx=None, *, cutoff=None):
 
 def fast_indexset_sparse_count_w_cutoff(k, l, cutoff, i=0, idx=None):
     """Optimized recursive count of sparse index sets while preventing redundancy."""
-    
+
     if idx is None:
         idx = cykhash.Int32toInt32Map()
 
@@ -74,11 +74,12 @@ def fast_indexset_sparse_count_w_cutoff(k, l, cutoff, i=0, idx=None):
     while j * k(i) < l:
         if i not in idx:  # Only allow `i: j` if it hasn't been assigned
             idx[i] = j  # Assign `i: j`
-            count_val += fast_indexset_sparse_count_w_cutoff(k, l - j * k(i),cutoff, i + 1, idx)
+            count_val += fast_indexset_sparse_count_w_cutoff(k, l - j * k(i), cutoff, i + 1, idx)
             del idx[i]  # Restore state after recursion
         j += 1
 
     return count_val
+
 
 def abs_e_sparse(k, l, i=0, e=None, *, nu=None, cutoff=None):
     if e is None:
@@ -96,6 +97,7 @@ def abs_e_sparse(k, l, i=0, e=None, *, nu=None, cutoff=None):
         r += abs_e_sparse(k, l - k(i), i + 1, e + 1, cutoff=cutoff)
     return r
 
+
 def count_abs_e_sparse_fast_pow_w_cutoff(k, l, cutoff, i=0, e=None, *, nu=None):
     """Optimized version of abs_e_sparse applying `& 1` inline."""
     if e is None:
@@ -111,7 +113,7 @@ def count_abs_e_sparse_fast_pow_w_cutoff(k, l, cutoff, i=0, e=None, *, nu=None):
 
     # Case 1: Skip k(i) and move to the next index
     i_plus_1 = i + 1
-    if (i_plus_1< cutoff) and k(i_plus_1) < l:
+    if (i_plus_1 < cutoff) and k(i_plus_1) < l:
         count_val += count_abs_e_sparse_fast_pow_w_cutoff(k, l, cutoff, i_plus_1, e)
 
     else:
@@ -124,11 +126,14 @@ def count_abs_e_sparse_fast_pow_w_cutoff(k, l, cutoff, i=0, e=None, *, nu=None):
 
     return count_val
 
+
 def smolyak_coefficient_zeta_sparse(k, l, *, nu=None, cutoff=None) -> int:
     return np.sum([(-1) ** e for e in abs_e_sparse(k, l, nu=nu, cutoff=cutoff)])
 
-def fast_smolyak_coefficient_zeta_sparse(k, l, *, nu=None, cutoff=None)-> int:
+
+def fast_smolyak_coefficient_zeta_sparse(k, l, *, nu=None, cutoff=None) -> int:
     return count_abs_e_sparse_fast_pow_w_cutoff(k, l, cutoff, nu=nu)
+
 
 def sparse_index_to_dense(nu, cutoff=None) -> tuple:
     if cutoff is None:
