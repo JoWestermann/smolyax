@@ -5,7 +5,7 @@ from jax_smolyak.smolyak import *
 import numpy as np
 import warnings
 
-np.seterr(all='raise')  # Treat floating-point warnings as errors
+np.seterr(all="raise")  # Treat floating-point warnings as errors
 warnings.simplefilter("error")  # Treat all Python warnings as errors
 
 
@@ -21,7 +21,10 @@ def test_smolyak_scalar():
 
         ip = SmolyakBarycentricInterpolator(g, k, l)
         ff = setup.generate_test_function_smolyak(g=g, k=k, l=l, d_out=1)
-        def f(x): return np.squeeze(ff(x))
+
+        def f(x):
+            return np.squeeze(ff(x))
+
         ip.set_F(f)
 
         for n in range(5):

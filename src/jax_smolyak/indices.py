@@ -33,23 +33,43 @@ def unitball(nu, k, l, e=None):
 def smolyak_coefficient_zeta_dense(k, l, *, nu=None):
     return np.sum([(-1) ** (np.sum(e)) for e in unitball(nu, k, l)])
 
+def indexset_sparse_w_cutoff(k, l, cutoff, i=0, idx=None):
+    if idx is None:
+        idx = {}
+    if i >= cutoff:
+        return [idx]
+    r = []
+    if (i + 1 < cutoff) and k(i + 1) < l:
+        r += indexset_sparse_w_cutoff(k, l, cutoff, i + 1, idx)
+    else:
+        r += [idx]
+    j = 1
+    while j * k(i) < l:
+        if i not in idx:  # Only allow `i: j` if it hasn't been assigned
+            idx[i] = j  # Assign `i: j`
+            r += indexset_sparse_w_cutoff(k, l - j * k(i), cutoff, i + 1, {**idx, i: j})
+            del idx[i]  # Restore state after recursion
+        j += 1
+    return r
 
-def indexset_sparse(k, l, i=0, idx=None, *, cutoff=None):
+def indexset_sparse(k, l, cutoff, i=0, idx=None):
     if idx is None:
         idx = {}
     if cutoff is not None and i >= cutoff:
         return [idx]
     r = []
     if (cutoff is None or i + 1 < cutoff) and k(i + 1) < l:
-        r += indexset_sparse(k, l, i + 1, idx, cutoff=cutoff)
+        r += indexset_sparse(k, l, cutoff, i + 1, idx)
     else:
         r += [idx]
     j = 1
     while j * k(i) < l:
-        r += indexset_sparse(k, l - j * k(i), i + 1, {**idx, i: j}, cutoff=cutoff)
+        if i not in idx:  # Only allow `i: j` if it hasn't been assigned
+            idx[i] = j  # Assign `i: j`
+            r += indexset_sparse(k, l - j * k(i), cutoff, i + 1, {**idx, i: j})
+            del idx[i]  # Restore state after recursion
         j += 1
     return r
-
 
 def fast_indexset_sparse_count_w_cutoff(k, l, cutoff, i=0, idx=None):
     """Optimized recursive count of sparse index sets while preventing redundancy."""

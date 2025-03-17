@@ -34,10 +34,22 @@ def evaluate_univariate_polynomial(g, nu, x):
 
 def evaluate_multivariate_polynomial(g, nu, x):
     if x.ndim <= 1:
-        return np.prod([evaluate_univariate_polynomial(gi, nui, xi) for gi, nui, xi in zip(g, nu, x)])
+        return np.prod(
+            [
+                evaluate_univariate_polynomial(gi, nui, xi)
+                for gi, nui, xi in zip(g, nu, x)
+            ]
+        )
     elif x.ndim == 2:
-        return np.prod(np.array([evaluate_univariate_polynomial(gi, nui, xi)
-                       for gi, nui, xi in zip(g, nu, x.T)]), axis=0).T
+        return np.prod(
+            np.array(
+                [
+                    evaluate_univariate_polynomial(gi, nui, xi)
+                    for gi, nui, xi in zip(g, nu, x.T)
+                ]
+            ),
+            axis=0,
+        ).T
     else:
         raise
 
@@ -58,5 +70,7 @@ def generate_test_function_smolyak(*, g, k, l, d_out):
         idxs = indices.indexset_sparse(lambda j: k[j], li, cutoff=len(k))
         j = np.random.randint(len(idxs))
         selected_idxs.append(indices.sparse_index_to_dense(idxs[j], cutoff=len(k)))
-    print('\t Test polynomials with degrees', selected_idxs)
-    return lambda x: np.array([evaluate_multivariate_polynomial(g, nu, x) for nu in selected_idxs]).T
+    print("\t Test polynomials with degrees", selected_idxs)
+    return lambda x: np.array(
+        [evaluate_multivariate_polynomial(g, nu, x) for nu in selected_idxs]
+    ).T

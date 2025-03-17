@@ -33,7 +33,7 @@ def __evaluate_tensorproduct_interpolant(
 def _create_evaluate_tensorproduct_interpolant_for_vmap(k: int):
     def wrapped_function(x, F, *args):
         m_list = args[:k]
-        w_list = args[k:2 * k]
+        w_list = args[k: 2 * k]
         j_list = args[2 * k]
         return __evaluate_tensorproduct_interpolant(x, F, m_list, w_list, j_list)
 
@@ -49,18 +49,22 @@ class MultivariateSmolyakBarycentricInterpolator:
     def __init__(
         self, *, g, k, l, rank: int, f: Callable = None, batchsize: int = 250
     ) -> None:
+        
         self.d = len(k)
         self.d_out = rank
         self._is_nested = g._is_nested
 
         # Compute coefficients and multi-indices of the Smolyak Operator
         zetas = []
-        indxs_all = indices.indexset_sparse(lambda j: k[j], l, cutoff=self.d)
+        indxs_all = indices.indexset_sparse_w_cutoff(lambda j: k[j], l, cutoff=self.d)
         indxs_zeta = []
         for idx in indxs_all:
-            zeta = indices.smolyak_coefficient_zeta_sparse(
+            zeta = indices.fast_smolyak_coefficient_zeta_sparse(
                 lambda j: k[j], l, nu=idx, cutoff=self.d
             )
+            # assert zeta == indices.smolyak_coefficient_zeta_sparse(
+            #     lambda j: k[j], l, nu=idx, cutoff=self.d
+            # )
             if zeta != 0:
                 zetas.append(zeta)
                 indxs_zeta.append(idx)
@@ -163,9 +167,9 @@ class MultivariateSmolyakBarycentricInterpolator:
                     Fo = F
                 else:
                     Fo = F.get(degrees, {})
-                print(len(Fo.keys()), "fo.keys length")
-                for idx in it.product(*(range(d + 1)
-                                      for d in degrees)):  # can we loop not through all indices, but only
+                for idx in it.product(
+                    *(range(d + 1) for d in degrees)
+                ):  # can we loop not through all indices, but only
                     # ridx can be known a prior as a function of data_l_t_i and a sparse idx
                     ridx = tuple(idx[j] for j in data_l_t_i)
                     # print(idx, data_l_t_i, (tuple(ridx))) #t = 1235 maps to the same ridx as
@@ -177,7 +181,9 @@ class MultivariateSmolyakBarycentricInterpolator:
                             x[dim] = data_l_n[k][i][deg]
                         Fo[idx] = f(x)
                         self.n_f_evals += 1
-                    data_l_f_i[:, *ridx] = Fo[idx]  # idx can be sparse,rather than dense!
+                    data_l_f_i[:, *ridx] = Fo[
+                        idx
+                    ]  # idx can be sparse,rather than dense!
                 if not self.is_nested:
                     F[degrees] = Fo
             # cast to jnp data structures
