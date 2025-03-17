@@ -2,6 +2,8 @@ from typing import Mapping
 
 import numpy as np
 import cykhash
+
+
 # deprecated
 def indexset_dense(k, t, idx=None):
     if idx is None:
@@ -31,6 +33,7 @@ def unitball(nu, k, t, e=None):
 def smolyak_coefficient_zeta_dense(k, t, *, nu=None):
     return np.sum([(-1) ** (np.sum(e)) for e in unitball(nu, k, t)])
 
+
 def indexset_sparse_w_cutoff(k, l, cutoff, i=0, idx=None):
     if idx is None:
         idx = {}
@@ -50,6 +53,7 @@ def indexset_sparse_w_cutoff(k, l, cutoff, i=0, idx=None):
         j += 1
     return r
 
+
 def indexset_sparse(k, t, i=0, idx=None, *, cutoff=None):
     if idx is None:
         idx = {}
@@ -64,10 +68,11 @@ def indexset_sparse(k, t, i=0, idx=None, *, cutoff=None):
     while j * k(i) < t:
         if i not in idx:  # Only allow `i: j` if it hasn't been assigned
             idx[i] = j  # Assign `i: j`
-            r += indexset_sparse(k, t - j * k(i),  i + 1, {**idx, i: j}, cutoff=cutoff)
+            r += indexset_sparse(k, t - j * k(i), i + 1, {**idx, i: j}, cutoff=cutoff)
             del idx[i]  # Restore state after recursion
         j += 1
     return r
+
 
 def fast_indexset_sparse_count_w_cutoff(k, l, cutoff, i=0, idx=None):
     """Optimized recursive count of sparse index sets while preventing redundancy."""
@@ -92,7 +97,9 @@ def fast_indexset_sparse_count_w_cutoff(k, l, cutoff, i=0, idx=None):
     while j * k(i) < l:
         if i not in idx:  # Only allow `i: j` if it hasn't been assigned
             idx[i] = j  # Assign `i: j`
-            count_val += fast_indexset_sparse_count_w_cutoff(k, l - j * k(i), cutoff, i + 1, idx)
+            count_val += fast_indexset_sparse_count_w_cutoff(
+                k, l - j * k(i), cutoff, i + 1, idx
+            )
             del idx[i]  # Restore state after recursion
         j += 1
 
@@ -140,7 +147,9 @@ def count_abs_e_sparse_fast_pow_w_cutoff(k, l, cutoff, i=0, e=None, *, nu=None):
     # Case 2: Include k(i) and recurse
     k_i = k(i)
     if k_i < l:
-        count_val += count_abs_e_sparse_fast_pow_w_cutoff(k, l - k_i, cutoff, i_plus_1, e + 1)
+        count_val += count_abs_e_sparse_fast_pow_w_cutoff(
+            k, l - k_i, cutoff, i_plus_1, e + 1
+        )
 
     return count_val
 
@@ -177,7 +186,9 @@ def cardinality(kmap, t, cutoff, nested: bool = False) -> int:
         iset = indexset_sparse(kmap, t, cutoff=cutoff)
         n = 0
         for nu in iset:
-            c = np.sum(1 - 2 * (np.array(abs_e_sparse(kmap, t, nu=nu, cutoff=cutoff)) & 1))
+            c = np.sum(
+                1 - 2 * (np.array(abs_e_sparse(kmap, t, nu=nu, cutoff=cutoff)) & 1)
+            )
             if c != 0:
                 n += np.prod([v + 1 for v in nu.values()])
         return n

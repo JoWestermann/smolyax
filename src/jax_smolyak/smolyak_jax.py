@@ -122,10 +122,16 @@ class MultivariateSmolyakBarycentricInterpolator:
                     self.data[n]["xi"][t][i, :num_nodes] = nodes
 
                     # Compute weights using NumPy broadcasting instead of list comprehension
-                    nodes_array = np.array(nodes)  # Convert to NumPy array for broadcasting
-                    diffs = nodes_array[:, None] - nodes_array  # Compute all pairwise differences
+                    nodes_array = np.array(
+                        nodes
+                    )  # Convert to NumPy array for broadcasting
+                    diffs = (
+                        nodes_array[:, None] - nodes_array
+                    )  # Compute all pairwise differences
                     np.fill_diagonal(diffs, 1)  # Avoid division by zero on the diagonal
-                    self.data[n]["w"][t][i, :num_nodes] = 1 / np.prod(diffs, axis=1)  # Compute weights
+                    self.data[n]["w"][t][i, :num_nodes] = 1 / np.prod(
+                        diffs, axis=1
+                    )  # Compute weights
 
         # Other variables, info, etc
         self.zero = g.get_zero()
