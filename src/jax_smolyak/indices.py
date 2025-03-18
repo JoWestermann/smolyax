@@ -233,7 +233,6 @@ def cardinality(kmap, t, cutoff, nested: bool = False) -> int:
         #     for nu in indices
         #     if cardinality_of_multiindex(kmap, t, nu, cutoff) != 0
         # ]
-        # assert cardinalit == np.sum(cardinalities2, dtype=np.int32), f"{cardinalit}, {np.sum(cardinalities2, dtype=np.int32)}"
         return total
 
 
