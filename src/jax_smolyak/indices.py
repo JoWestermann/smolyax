@@ -213,11 +213,15 @@ def cardinality(kmap, t, cutoff, nested: bool = False) -> int:
         return count_without_constructing_idx_set(kmap, t, cutoff)
     else:
         indices = indexset_sparse(kmap, t, cutoff=cutoff)
-        total = np.sum([
-        np.prod([v + 1 for v in nu.values()])
-        for nu in indices if not all((x == 0 for x in nu.values()))  # Skip only if all zeros
-    ], dtype=np.int32)
-        
+        total = np.sum(
+            [
+                np.prod([v + 1 for v in nu.values()])
+                for nu in indices
+                if not all((x == 0 for x in nu.values()))  # Skip only if all zeros
+            ],
+            dtype=np.int32,
+        )
+
         # n = 0
         # for nu in indices:
         #     c = np.sum([(-1) ** e for e in abs_e_sparse(kmap, t, nu=nu, cutoff=cutoff)])
@@ -231,6 +235,7 @@ def cardinality(kmap, t, cutoff, nested: bool = False) -> int:
         # ]
         # assert cardinalit == np.sum(cardinalities2, dtype=np.int32), f"{cardinalit}, {np.sum(cardinalities2, dtype=np.int32)}"
         return total
+
 
 def find_suitable_t(k: Mapping, m: int = 50, nested: bool = False) -> int:
     """
