@@ -4,7 +4,7 @@ from typing import Callable
 import numpy as np
 from numpy.typing import ArrayLike
 
-from . import indices
+from . import indices, nodes
 from .tensorproduct import TensorProductBarycentricInterpolator
 
 
@@ -14,11 +14,13 @@ class SmolyakBarycentricInterpolator:
     def is_nested(self) -> bool:
         return self._is_nested
 
-    def __init__(self, g, k: ArrayLike, t: float, f: Callable = None):
+    def __init__(
+        self, node_gen: nodes.Generator, k: ArrayLike, t: float, f: Callable = None
+    ):
         self.k = k
         self.operators = []
         self.coefficients = []
-        self._is_nested = g.is_nested
+        self._is_nested = node_gen.is_nested
 
         def kmap(j):
             return k[j]
@@ -28,7 +30,7 @@ class SmolyakBarycentricInterpolator:
             c = indices.smolyak_coefficient_zeta_sparse(kmap, t, nu=nu, cutoff=len(k))
             if c != 0:
                 self.operators.append(
-                    TensorProductBarycentricInterpolator(g, nu, len(k))
+                    TensorProductBarycentricInterpolator(node_gen, nu, len(k))
                 )
                 self.coefficients.append(c)
         if self.is_nested:
@@ -48,11 +50,9 @@ class SmolyakBarycentricInterpolator:
                     ridx = o.reduced_index(idx)
                     if idx not in F.keys():
                         o.set_x(ridx)
-                        # F[idx] = {'x' : deepcopy(o.x), 'Fx' : None}
                         F[idx] = f(o.x)
                         self.n_f_evals += 1
                     if i is None:
-                        # continue
                         o.F[ridx] = F[idx]
                     else:
                         o.F[ridx] = F[idx][i]
@@ -81,8 +81,15 @@ class SmolyakBarycentricInterpolator:
 
 class MultivariateSmolyakBarycentricInterpolator:
 
-    def __init__(self, *, g, k: ArrayLike, t: ArrayLike, f: Callable = None):
-        self.components = [SmolyakBarycentricInterpolator(g, k, ti) for ti in t]
+    def __init__(
+        self,
+        *,
+        node_gen: nodes.Generator,
+        k: ArrayLike,
+        t: ArrayLike,
+        f: Callable = None,
+    ):
+        self.components = [SmolyakBarycentricInterpolator(node_gen, k, ti) for ti in t]
         self.n = max(c.n for c in self.components)
         self.F = None
         if f is not None:

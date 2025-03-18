@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import numpy as np
 from numpy.typing import ArrayLike
 
-from . import barycentric, indices
+from . import barycentric, indices, nodes
 
 jax.config.update("jax_enable_x64", True)
 
@@ -47,7 +47,14 @@ class MultivariateSmolyakBarycentricInterpolator:
         return self._is_nested
 
     def __init__(
-        self, *, g, k, t, d_out: int, f: Callable = None, batchsize: int = 250
+        self,
+        *,
+        node_gen: nodes.Generator,
+        k: ArrayLike,
+        t: float,
+        d_out: int,
+        f: Callable = None,
+        batchsize: int = 250,
     ) -> None:
         """
         g : node generator object
@@ -57,7 +64,7 @@ class MultivariateSmolyakBarycentricInterpolator:
         """
         self.d = len(k)
         self.d_out = d_out
-        self._is_nested = g.is_nested
+        self._is_nested = node_gen.is_nested
 
         # Compute coefficients and multi-indices of the Smolyak Operator
         zetas = []
@@ -116,14 +123,14 @@ class MultivariateSmolyakBarycentricInterpolator:
 
                 for t, o in enumerate(ordering):
                     dim = adims[o]
-                    nodes = g[dim](nu[dim])
+                    nodes = node_gen[dim](nu[dim])
                     self.data[n]["xi"][t][i][: len(nodes)] = nodes
                     self.data[n]["w"][t][i][: len(nodes)] = barycentric.compute_weights(
                         nodes
                     )
 
         # Other variables, info, etc
-        self.zero = g.get_zero()
+        self.zero = node_gen.get_zero()
         if self.is_nested:
             self.n = len(indxs_all)
         else:
