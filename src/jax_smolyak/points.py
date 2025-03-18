@@ -64,7 +64,7 @@ class Leja(Points):
     nodes = np.array([0, 1, -1, 1 / np.sqrt(2), -1 / np.sqrt(2)])
     _default_domain = [-1, 1]
 
-    def __init__(self, domain: ArrayLike = None) -> None:
+    def __init__(self, domain: ArrayLike) -> None:
         super().__init__(is_nested=True)
         self.domain = domain
 
@@ -207,7 +207,7 @@ class LejaMulti(Multi):
         if domains is not None:
             Multi.__init__(self, [Leja(domain) for domain in domains])
         elif d is not None:
-            Multi.__init__(self, [Leja() for _ in range(d)])
+            Multi.__init__(self, [Leja(domain=(-1, 1)) for _ in range(d)])
         else:
             raise
 
