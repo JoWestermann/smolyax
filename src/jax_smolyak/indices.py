@@ -74,7 +74,7 @@ def indexset_sparse(k, t, i=0, idx=None, *, cutoff=None):
     return r
 
 
-def fast_indexset_sparse_count_w_cutoff(k, t, cutoff, i=0, idx=None):
+def count_without_constructing_idx_set(k, t, cutoff, i=0, idx=None):
     """Optimized recursive count of sparse index sets while preventing redundancy."""
 
     if idx is None:
@@ -88,7 +88,7 @@ def fast_indexset_sparse_count_w_cutoff(k, t, cutoff, i=0, idx=None):
 
     # Case 1: Skip k(i) and move to the next index
     if (i + 1 < cutoff) and k(i + 1) < t:
-        count_val += fast_indexset_sparse_count_w_cutoff(k, t, cutoff, i + 1, idx)
+        count_val += count_without_constructing_idx_set(k, t, cutoff, i + 1, idx)
     else:
         count_val += 1
 
@@ -97,7 +97,7 @@ def fast_indexset_sparse_count_w_cutoff(k, t, cutoff, i=0, idx=None):
     while j * k(i) < t:
         if i not in idx:  # Only allow `i: j` if it hasn't been assigned
             idx[i] = j  # Assign `i: j`
-            count_val += fast_indexset_sparse_count_w_cutoff(
+            count_val += count_without_constructing_idx_set(
                 k, t - j * k(i), cutoff, i + 1, idx
             )
             del idx[i]  # Restore state after recursion
@@ -122,6 +122,7 @@ def abs_e_sparse(k, t, i=0, e=None, *, nu=None, cutoff=None):
         r += abs_e_sparse(k, t - k(i), i + 1, e + 1, cutoff=cutoff)
     return r
 
+
 def abs_e_sparse_sum(k, t, cutoff):
     """Computes sum((-1)^e) inline, correctly including all values of e."""
     stack = [(0, t, 0)]  # Stack holds (i, remaining t, e)
@@ -132,7 +133,7 @@ def abs_e_sparse_sum(k, t, cutoff):
 
         # Ensure we count *every* valid `e`, even when `e=0`
         if i >= cutoff or t_rem <= 0:
-            result_sum += (1 - 2 * (e & 1))
+            result_sum += 1 - 2 * (e & 1)
             continue
 
         k_i = k(i)  # Avoid redundant function calls
@@ -146,10 +147,12 @@ def abs_e_sparse_sum(k, t, cutoff):
 
     return result_sum
 
+
 def cardinality_of_multiindex(k, t, nu, cutoff):
     """Handles `nu` initialization and calls the optimized sum computation."""
     t -= np.sum(nu[j] * k(j) for j in nu.keys())  # Apply `nu` adjustment
     return abs_e_sparse_sum(k, t, cutoff)  # Directly compute sum inline
+
 
 def count_abs_e_sparse_fast_pow_w_cutoff(k, t, cutoff, i=0, e=None, *, nu=None) -> int:
     """Optimized version of abs_e_sparse applying `& 1` inline."""
@@ -169,7 +172,7 @@ def count_abs_e_sparse_fast_pow_w_cutoff(k, t, cutoff, i=0, e=None, *, nu=None) 
 
     else:
         count_val += 1 - 2 * (e & 1)  # Inline computation of (-1)^e
-    
+
     # Case 2: Include k(i) and recurse
     k_i = k(i)
     if k_i < t:
@@ -207,15 +210,27 @@ def dense_index_to_sparse(dense_nu):
 
 def cardinality(kmap, t, cutoff, nested: bool = False) -> int:
     if nested:
-        return fast_indexset_sparse_count_w_cutoff(kmap, t, cutoff)
+        return count_without_constructing_idx_set(kmap, t, cutoff)
     else:
         indices = indexset_sparse(kmap, t, cutoff=cutoff)
-        cardinalities = [
-            np.prod([v + 1 for v in nu.values()])
-            for nu in indices if cardinality_of_multiindex(kmap, t, nu, cutoff) != 0
-        ]
-        return np.sum(cardinalities, dtype=np.int64)
+        total = np.sum([
+        np.prod([v + 1 for v in nu.values()])
+        for nu in indices if not all((x == 0 for x in nu.values()))  # Skip only if all zeros
+    ], dtype=np.int32)
+        
+        # n = 0
+        # for nu in indices:
+        #     c = np.sum([(-1) ** e for e in abs_e_sparse(kmap, t, nu=nu, cutoff=cutoff)])
+        #     if c != 0:
+        #         n += np.prod([v + 1 for v in nu.values()])
 
+        # cardinalities2 = [
+        #     np.prod([v + 1 for v in nu.values()])
+        #     for nu in indices
+        #     if cardinality_of_multiindex(kmap, t, nu, cutoff) != 0
+        # ]
+        # assert cardinalit == np.sum(cardinalities2, dtype=np.int32), f"{cardinalit}, {np.sum(cardinalities2, dtype=np.int32)}"
+        return total
 
 def find_suitable_t(k: Mapping, m: int = 50, nested: bool = False) -> int:
     """
