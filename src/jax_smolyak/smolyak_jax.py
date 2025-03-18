@@ -1,171 +1,216 @@
 import copy
-import numpy as np
+import itertools as it
+from typing import Callable, List
+
 import jax
 import jax.numpy as jnp
-import itertools as it
+import numpy as np
+from numpy.typing import ArrayLike
 
 from . import indices
 
 jax.config.update("jax_enable_x64", True)
 
 
-def evaluate_tensorproduct_interpolant(x, F, n_list, w_list, t_list) :
+def __evaluate_tensorproduct_interpolant(
+    x: ArrayLike, F: ArrayLike, xi_list: List, w_list: List, s_list: List
+) -> ArrayLike:
     norm = jnp.ones(x.shape[0])
-    for i, ti in enumerate(t_list):
-        b = x[:, [ti]] - n_list[i]
+    for i, si in enumerate(s_list):
+        b = x[:, [si]] - xi_list[i]
         has_zero = jnp.any(b == 0, axis=1)
         zero_pattern = jnp.where(b == 0, 1.0, 0.0)
         normal = w_list[i] / b
         b = jnp.where(has_zero[:, None], zero_pattern, normal)
         if i == 0:
-            F = jnp.einsum(f'ij,kj...->ik...', b, F)
+            F = jnp.einsum("ij,kj...->ik...", b, F)
         else:
-            F = jnp.einsum(f'ij,ikj...->ik...', b, F)
+            F = jnp.einsum("ij,ikj...->ik...", b, F)
         norm *= jnp.sum(b, axis=1)
     return F / norm[:, None]
 
 
-def create_evaluate_tensorproduct_interpolant_for_vmap(k) :
-    def wrapped_function(x, F, *args) :
-        m_list = args[:k]
-        w_list = args[k:2*k]
-        j_list = args[2*k]
-        return evaluate_tensorproduct_interpolant(x, F, m_list, w_list, j_list)
+def _create_evaluate_tensorproduct_interpolant_for_vmap(n: int):
+    def wrapped_function(x, F, *args):
+        xi_list = args[:n]
+        w_list = args[n : 2 * n]
+        s_list = args[2 * n]
+        return __evaluate_tensorproduct_interpolant(x, F, xi_list, w_list, s_list)
+
     return jax.jit(wrapped_function)
 
 
-class MultivariateSmolyakBarycentricInterpolator :
+class MultivariateSmolyakBarycentricInterpolator:
 
-    def __init__(self, *, g, k, l, rank, f=None, batchsize=250) :
+    @property
+    def is_nested(self) -> bool:
+        return self._is_nested
+
+    def __init__(
+        self, *, g, k, t, d_out: int, f: Callable = None, batchsize: int = 250
+    ) -> None:
+        """
+        g : node generator object
+        k : weight vector of the anisotropy of the multi-index set (TODO: move construction of multi-index outside)
+        t : threshold controlling the size of the multi-index set
+        d_out : dimension of the output of the target function f
+        """
         self.d = len(k)
-        self.d_out = rank
-        self.is_nested = g.is_nested
+        self.d_out = d_out
+        self._is_nested = g.is_nested
 
         # Compute coefficients and multi-indices of the Smolyak Operator
         zetas = []
-        indxs_all = indices.indexset_sparse(lambda j : k[j], l, cutoff=self.d)
+        indxs_all = indices.indexset_sparse(lambda j: k[j], t, cutoff=self.d)
         indxs_zeta = []
-        for idx in indxs_all :
-            zeta = indices.smolyak_coefficient_zeta_sparse(lambda j : k[j], l, nu=idx, cutoff=self.d)
-            if zeta != 0 :
+        for nu in indxs_all:
+            zeta = indices.smolyak_coefficient_zeta_sparse(
+                lambda j: k[j], t, nu=nu, cutoff=self.d
+            )
+            if zeta != 0:
                 zetas.append(zeta)
-                indxs_zeta.append(idx)
+                indxs_zeta.append(nu)
 
         # Compute base shapes for which `evaluate` will be compiled and sort coeffs and idxs accordingly
-        self.k_2_tau = {}
-        self.k_2_lambda_k = {}
-        self.k_2_zetas = {}
-        for zeta, nu in zip(zetas, indxs_zeta) :
+        self.n_2_tau = {}
+        self.n_2_lambda_n = {}
+        self.n_2_zetas = {}
+        for zeta, nu in zip(zetas, indxs_zeta):
             tau = tuple(sorted(nu.values(), reverse=True))
-            kk = len(tau)
-            self.k_2_tau[kk] = tuple(max(nu1, nu2) for nu1, nu2 in zip(self.k_2_tau.get(kk, tau), tau))
-            self.k_2_lambda_k[kk] = self.k_2_lambda_k.get(kk, []) + [nu]
-            self.k_2_zetas[kk] = self.k_2_zetas.get(kk, []) + [zeta]
+            n = len(tau)
+            self.n_2_tau[n] = tuple(
+                max(tau1, tau2) for tau1, tau2 in zip(self.n_2_tau.get(n, tau), tau)
+            )
+            self.n_2_lambda_n[n] = self.n_2_lambda_n.get(n, []) + [nu]
+            self.n_2_zetas[n] = self.n_2_zetas.get(n, []) + [zeta]
 
         # Allocate and prefill data
         self.data = {}
-        self.compiledfuncs = {}
+        self.__compiledfuncs = {}
         self.offset = 0
-        for k in self.k_2_tau.keys() :
-            if k == 0 :
-                assert len(self.k_2_zetas[k]) == 1
-                self.offset = self.k_2_zetas[k][0]
+        for n in self.n_2_tau.keys():
+            if n == 0:
+                assert len(self.n_2_zetas[n]) == 1
+                self.offset = self.n_2_zetas[n][0]
                 continue
-            n = len(self.k_2_zetas[k])  # number of shapes with length k
-            s = self.k_2_tau[k]  # max shape
+            nn = len(self.n_2_zetas[n])  # number of indices in lambda_n
+            tau = self.n_2_tau[n]  # multi
 
-            if k not in self.data : self.data[k] = {}
-            self.data[k]['z'] = jnp.array(self.k_2_zetas[k])
-            self.data[k]['F'] = np.zeros((n, rank) + tuple(si+1 for si in s))
-            self.data[k]['n'] = [np.zeros((n, si+1)) for si in s]
-            self.data[k]['w'] = [np.zeros((n, si+1)) for si in s]
-            self.data[k]['t'] = np.zeros((n, k), dtype=int)
+            if n not in self.data:
+                self.data[n] = {}
+            self.data[n]["z"] = jnp.array(self.n_2_zetas[n])
+            self.data[n]["F"] = np.zeros(
+                (nn, d_out) + tuple(tau_i + 1 for tau_i in tau)
+            )
+            self.data[n]["xi"] = [np.zeros((nn, tau_i + 1)) for tau_i in tau]
+            self.data[n]["w"] = [np.zeros((nn, tau_i + 1)) for tau_i in tau]
+            self.data[n]["s"] = np.zeros((nn, n), dtype=int)
 
-            for i, idx in enumerate(self.k_2_lambda_k[k]) :
-                adims = list(idx.keys())  # active dimensions
-                ordering = sorted(range(k), key=lambda i: list(idx.values())[i], reverse=True)
+            for i, nu in enumerate(self.n_2_lambda_n[n]):
+                adims = list(nu.keys())  # active dimensions
+                ordering = sorted(
+                    range(n), key=lambda i: list(nu.values())[i], reverse=True
+                )
 
-                self.data[k]['t'][i] = [adims[o] for o in ordering]
+                self.data[n]["s"][i] = [adims[o] for o in ordering]
 
-                for t, o in enumerate(ordering) :
+                for t, o in enumerate(ordering):
                     dim = adims[o]
-                    nodes = g[dim](idx[dim])
-                    self.data[k]['n'][t][i][:len(nodes)] = nodes
-                    self.data[k]['w'][t][i][:len(nodes)] = [1/np.prod([nj - nk for nk in nodes if nk != nj]) for nj in nodes]
+                    nodes = g[dim](nu[dim])
+                    self.data[n]["xi"][t][i][: len(nodes)] = nodes
+                    self.data[n]["w"][t][i][: len(nodes)] = [
+                        1 / np.prod([nj - nk for nk in nodes if nk != nj])
+                        for nj in nodes
+                    ]
 
         # Other variables, info, etc
         self.zero = g.get_zero()
-        if self.is_nested :
+        if self.is_nested:
             self.n = len(indxs_all)
-        else :
-            self.n = int(np.sum([np.prod([si+1 for si in idx.values()]) for idx in indxs_zeta]))
+        else:
+            self.n = int(
+                np.sum([np.prod([si + 1 for si in idx.values()]) for idx in indxs_zeta])
+            )
         self.n_f_evals = 0
 
-        if f is not None :
+        if f is not None:
             self.set_F(f=f, batchsize=batchsize)
 
-    def set_F(self, *, f, F=None, batchsize=250) :
-        if F is None : F = {}
+    def set_F(self, *, f: Callable, F: dict = None, batchsize: int = 250) -> dict:
+        if F is None:
+            F = {}
 
-        # Special case l = 0
-        idx = indices.sparse_index_to_dense({}, self.d)
-        if self.is_nested :
+        # Special case n = 0
+        nu = indices.sparse_index_to_dense({}, self.d)
+        if self.is_nested:
             Fo = F
-        else :
-            Fo = F.get(idx, {})  # in this case, idx == degrees
-        if idx not in Fo.keys() :
-            Fo[idx] = f(copy.deepcopy(self.zero))
+        else:
+            Fo = F.get(nu, {})  # in this case, idx == degrees
+        if nu not in Fo.keys():
+            Fo[nu] = f(copy.deepcopy(self.zero))
             self.n_f_evals += 1
-        self.offset *= Fo[idx]
+        self.offset *= Fo[nu]
 
-        if not self.is_nested : F[idx] = Fo
+        if not self.is_nested:
+            F[nu] = Fo
 
-        # l > 0
-        for l in self.data.keys() :
-            for i, nu in enumerate(self.k_2_lambda_k[l]) :
+        # n > 0
+        for n in self.data.keys():
+            for i, nu in enumerate(self.n_2_lambda_n[n]):
                 degrees = indices.sparse_index_to_dense(nu, self.d)
-                x       = copy.deepcopy(self.zero)
+                x = copy.deepcopy(self.zero)
 
-                if self.is_nested :
+                if self.is_nested:
                     Fo = F
-                else :
+                else:
                     Fo = F.get(degrees, {})
 
-                for idx in it.product(*(range(d+1) for d in degrees)) :
-                    ridx = tuple(idx[j] for j in self.data[l]['t'][i])
-                    if idx not in Fo.keys() :
-                        for k, (dim, deg) in enumerate(zip(self.data[l]['t'][i], ridx)) :
-                            x[dim] = self.data[l]['n'][k][i][deg]
-                        Fo[idx] = f(x)
+                for mu in it.product(*(range(d + 1) for d in degrees)):
+                    ridx = tuple(mu[j] for j in self.data[n]["s"][i])
+                    if mu not in Fo.keys():
+                        for k, (dim, deg) in enumerate(zip(self.data[n]["s"][i], ridx)):
+                            x[dim] = self.data[n]["xi"][k][i][deg]
+                        Fo[mu] = f(x)
                         self.n_f_evals += 1
-                    self.data[l]['F'][i][:,*ridx] = Fo[idx]
+                    self.data[n]["F"][i][:, *ridx] = Fo[mu]
 
-                if not self.is_nested : F[degrees] = Fo
+                if not self.is_nested:
+                    F[degrees] = Fo
 
             # cast to jnp data structures
-            self.data[l]['F'] = jnp.array(self.data[l]['F'])
-            self.data[l]['n'] = [jnp.array(n) for n in self.data[l]['n']]
-            self.data[l]['w'] = [jnp.array(n) for n in self.data[l]['w']]
-            self.data[l]['t'] = jnp.array(self.data[l]['t'])
+            self.data[n]["F"] = jnp.array(self.data[n]["F"])
+            self.data[n]["xi"] = [jnp.array(data) for data in self.data[n]["xi"]]
+            self.data[n]["w"] = [jnp.array(data) for data in self.data[n]["w"]]
+            self.data[n]["s"] = jnp.array(self.data[n]["s"])
 
-        self.compile_for_batchsize(batchsize)
+        self.__compile_for_batchsize(batchsize)
 
         return F
 
-    def compile_for_batchsize(self, batchsize) :
-        for k in self.data.keys() :
-            self.compiledfuncs[k] = jax.vmap(create_evaluate_tensorproduct_interpolant_for_vmap(k),
-                                             in_axes=(None, 0) + (0,) * (2 * k) + (0,))
+    def __compile_for_batchsize(self, batchsize: int) -> None:
+        for k in self.data.keys():
+            self.__compiledfuncs[k] = jax.vmap(
+                _create_evaluate_tensorproduct_interpolant_for_vmap(k),
+                in_axes=(None, 0) + (0,) * (2 * k) + (0,),
+            )
         _ = self(np.random.random((batchsize, self.d)))
 
-    def __call__(self, x) :
-        assert bool(self.compiledfuncs) == bool(self.data), 'The operator has not yet been compiled for a target function.'
-        if x.shape == (self.d,) :
+    def __call__(self, x: ArrayLike) -> ArrayLike:
+        assert bool(self.__compiledfuncs) == bool(
+            self.data
+        ), "The operator has not yet been compiled for a target function."
+        if x.shape == (self.d,):
             x = x[None, :]
         I_Lambda_x = np.broadcast_to(self.offset, (x.shape[0], self.d_out))
-        for k in self.data.keys() :
-            res = self.compiledfuncs[k](x, self.data[k]['F'], *self.data[k]['n'], *self.data[k]['w'], self.data[k]['t'])
-            I_Lambda_x += jnp.tensordot(self.data[k]['z'], res, axes=(0, 0))
-        if isinstance(I_Lambda_x, np.ndarray) :
+        for n in self.data.keys():
+            res = self.__compiledfuncs[n](
+                x,
+                self.data[n]["F"],
+                *self.data[n]["xi"],
+                *self.data[n]["w"],
+                self.data[n]["s"],
+            )
+            I_Lambda_x += jnp.tensordot(self.data[n]["z"], res, axes=(0, 0))
+        if isinstance(I_Lambda_x, np.ndarray):
             return I_Lambda_x
         return I_Lambda_x.block_until_ready()

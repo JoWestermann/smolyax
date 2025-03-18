@@ -55,15 +55,15 @@ header-includes:
 
 We briefly summarize the essentials of high-dimensional interpolation, where sparse grids have become the standard choice for interpolation points. In this setting, the interpolation operator is commonly referred to as the Smolyak operator. This overview provides background and establishes notation, which will be used to describe our specific implementation choices in the next section.
 
-**Univariate interpolation.** Given a domain $D \subset \R$ and set of $\ell \in \N$ pairwise distinct interpolation points $(\xi^\ell_i)_{i=0}^\ell \subset D$, the polynomial interpolation operator $I^\ell : C^0(D) \to \bbP_\ell := {\rm span} \set{x^i}{i=0,\dots,\ell}$ is the mapping of a function $f$ onto the unique polynomial $I^\ell [f]$ of maximal degree $\ell$ such that $f(\xi^\ell_i) = I^\ell [f](\xi^\ell_i)$ for all $i\in\{0,1,\dots,\ell\}$.
+**Univariate interpolation.** Given a domain $D \subset \R$ and set of $\nu \in \N$ pairwise distinct interpolation points $(\xi^\nu_i)_{i=0}^\nu \subset D$, the polynomial interpolation operator $I^\nu : C^0(D) \to \bbP_\nu := {\rm span} \set{x^i}{i=0,\dots,\nu}$ maps a function $f : D \to \R$ onto the unique polynomial $I^\nu [f]$ of maximal degree $\nu$ such that $f(\xi^\nu_i) = I^\nu [f](\xi^\nu_i)$ for all $i\in\{0,1,\dots,\nu\}$.
 
 A classical method for evaluating the interpolating polynomial that is known for numerical stability is barycentric interpolation [@berrut:2004]. The univariate barycentric interpolation formula is given as
 \begin{align}
-    I^\ell [f] (x) := \frac{\sum_{i=0}^\ell b_i^\ell(x) f(\xi^\ell_i)}{\sum_{i=0}^\ell b_i^\ell(x)},
+    I^\nu [f] (x) := \frac{\sum_{i=0}^\nu b_i^\nu(x) f(\xi^\nu_i)}{\sum_{i=0}^\nu b_i^\nu(x)},
     \qquad \text{ with }
-    b_i^\ell(x) &:= \begin{cases} 1 &\text{ if } i = \ell = 0 \\ \frac{w_i^\ell}{x-\xi^\ell_i} &\text{ else }\end{cases} \\
+    b_i^\nu(x) &:= \begin{cases} 1 &\text{ if } i = \nu = 0 \\ \frac{w_i^\nu}{x-\xi^\nu_i} &\text{ else }\end{cases} \\
     \quad \text{ and }
-    w_i^\ell &:= \prod \limits_{k\in\{0,1,...,\ell\}/\{i\}}\frac{1}{(\xi^\ell_i - \xi^\ell_k)}.
+    w_i^\nu &:= \prod \limits_{k\in\{0,1,...,\nu\}/\{i\}}\frac{1}{(\xi^\nu_i - \xi^\nu_k)}.
 \end{align}
 
 **Tensorized interpolation** generalizes univariate interpolation to multivariate functions defined on a tensor-product domain $D = \otimes_{j=1}^d D_1$ with $D_1 \subset \R$ and $d \in \N$.
@@ -106,22 +106,22 @@ To leverage key HPC techniques such as vectorization, parallelization, and batch
 This reorganizes the tensors into a small number of large, structured data blocks, enabling efficient computation while keeping memory overhead modest.
 
 **Squeezing and permuting the dimensions of the tensorized interpolator.**
-For any multi-index $\bsnu \in \N_0^d$, denote with $t(\bsnu)$ the tuple consisting of the elements in $\{j \in \{1, ..., d\} \ : \ \nu_j > 0\}$ that permute the non-zero entries of $\bsnu$ descendingly. Let further $\bsnu^t := (\nu_j)_{j \in t(\bsnu)}$ and $d_\bsnu := |\bsnu_t| \equiv |t(\bsnu)| = | \set{j \in \{1, ..., d\}}{\nu_j > 0}| \le d$.
+For any multi-index $\bsnu \in \N_0^d$, denote with $s(\bsnu)$ the tuple consisting of the elements in $\{j \in \{1, ..., d\} \ : \ \nu_j > 0\}$ that permute the non-zero entries of $\bsnu$ descendingly. Let further $\bsnu^s := (\nu_j)_{j \in s(\bsnu)}$ and $d_\bsnu := |\bsnu_s| \equiv |s(\bsnu)| = | \set{j \in \{1, ..., d\}}{\nu_j > 0}| \le d$.
 
-_Example: For the multi-index $\bsnu = (3,0,2,0,4) \in \N_0^5$, it holds that $t(\bsnu) = (5,1,3)$, $\bsnu^t = (4,3,2)$ and $d_\bsnu = 3$._
+_Example: For the multi-index $\bsnu = (3,0,2,0,4) \in \N_0^5$, it holds that $s(\bsnu) = (5,1,3)$, $\bsnu^s = (4,3,2)$ and $d_\bsnu = 3$._
 
 With the above notation we can re-express the tensorized interpolation operator for $\bsnu$ as
 \begin{equation} \label{eq:ip_truncating}
-  I^\bsnu [f] (\bsx) \equiv I^{\bsnu, t} [f] (\bsx) :=
-    \frac{\bsb^{\nu^t_1}(x_{t_1(\bsnu)}) \bsb^{\nu^t_2}(x_{t_2(\bsnu)}) \cdots \bsb^{\nu^t_{d_\bsnu}}(x_{t_{d_\bsnu}(\bsnu)}) \bsF^{\bsnu,t}}
-    {\prod_{j=1}^{d_\bsnu} (\sum_{i=0}^{\nu^t_j} b_i^{\nu^t_j} (x_{t_j(\bsnu)}))}
+  I^\bsnu [f] (\bsx) \equiv I^{\bsnu, s} [f] (\bsx) :=
+    \frac{\bsb^{\nu^s_1}(x_{s_1(\bsnu)}) \bsb^{\nu^s_2}(x_{s_2(\bsnu)}) \cdots \bsb^{\nu^s_{d_\bsnu}}(x_{s_{d_\bsnu}(\bsnu)}) \bsF^{\bsnu,s}}
+    {\prod_{j=1}^{d_\bsnu} (\sum_{i=0}^{\nu^s_j} b_i^{\nu^s_j} (x_{s_j(\bsnu)}))}
     \quad \forall \bsx \in D,
 \end{equation}
-with $\bsF^{\bsnu,t} \in \R^{\bsnu^t + {\bm 1}}$ given as $F^{\bsnu,t}_{\bsmu} := f(\bsxi^{\bsnu, t}_\bsmu)$ for all $\bsmu \in \N_0^{d_\bsnu}$ s.t. $\bsmu \le \bsnu^t$, with
+with $\bsF^{\bsnu,s} \in \R^{\bsnu^s + {\bm 1}}$ given as $F^{\bsnu,s}_{\bsmu} := f(\bsxi^{\bsnu, s}_\bsmu)$ for all $\bsmu \in \N_0^{d_\bsnu}$ s.t. $\bsmu \le \bsnu^s$, with
 \begin{align*}
-    \left(\bsxi^{\bsnu, t}_\bsmu\right)_j :=
+    \left(\bsxi^{\bsnu, s}_\bsmu\right)_j :=
     \begin{cases}
-    \xi^{\nu_j}_{\mu_i} &\text{ if } j \in t(\bsnu) \text{ and } j=t_i(\bsnu)\\
+    \xi^{\nu_j}_{\mu_i} &\text{ if } j \in s(\bsnu) \text{ and } j=s_i(\bsnu)\\
     \xi^{\nu_j}_0 &\text{ else.}
     \end{cases}
 \end{align*}
@@ -143,10 +143,10 @@ Any tensorized interpolation operator $I^\bsnu$ can be padded to higher dimensio
     {\prod_{j=1}^d (\sum_{i=0}^{\tau_j} p^{\tau_j}_i(\bsb^{\nu_j} (x_j)))}.
 \end{equation}
 
-We write $I^{\bsnu, t, \bstau}$ when applying \eqref{eq:ip_truncating} and \eqref{eq:ip_padding} successively.
+We write $I^{\bsnu, s, \bstau}$ when applying \eqref{eq:ip_truncating} and \eqref{eq:ip_padding} successively.
 
 **Pseudocode of our implementation strategy.**
-We now have everything in place to construct the Smolyak interpolant in a form that is well-suited for vectorized execution. Algorithm \ref{alg:smolyak} outlines the key steps. Given a downward-closed but otherwise arbitrarily structured multi-index set $\Lambda$ and a target function $f$, we begin by identifying the subset $\Lambda_\zeta$ of multi-indices $\bsnu$ with nonzero Smolyak coefficients $\zeta_{\Lambda, \bsnu}$ and determining the maximal number $K$ of nonzero entries across these multi-indices. Notably, $K$ remains small (typically single-digit) even when the dimensionality $d$ reaches the hundreds and $|\Lambda|$ is on the order of tens of thousands. For each fixed sparsity level $k$, we extract the subset $\Lambda_k$ of multi-indices with exactly $k$ nonzero entries and determine the minimal bounding multi-index $\bstau \in \mathbb{N}_0^k$ such that $\bsnu^t \leq \bstau$ for all $\bsnu \in \Lambda_k$. This step ensures that all the tensorized interpolation operators $(I^\bsnu)_{\bsnu \in \Lambda_k}$ can be efficiently assembled into a single, vectorized computation. In Algorithm \ref{alg:smolyak}, this is compactly expressed as the summation of all $(I^{\bsnu, t, \bstau})_{\bsnu \in \Lambda_k}$, but in practice, it corresponds to pre-allocating and incrementally populating large arrays for interpolation nodes, weights, and function values. The final interpolant $I^\Lambda$ is then assembled through a brief loop over a small number of high-throughput operations, ensuring computational efficiency.
+We now have everything in place to construct the Smolyak interpolant in a form that is well-suited for vectorized execution. Algorithm \ref{alg:smolyak} outlines the key steps. Given a downward-closed but otherwise arbitrarily structured multi-index set $\Lambda$ and a target function $f$, we begin by identifying the subset $\Lambda_\zeta$ of multi-indices $\bsnu$ with nonzero Smolyak coefficients $\zeta_{\Lambda, \bsnu}$ and determining the maximal number $N \le d$ of nonzero entries across these multi-indices. Notably, $N$ remains small (typically single-digit) even when the dimensionality $d$ reaches the hundreds and $|\Lambda|$ is on the order of tens of thousands. For each fixed sparsity level $n \in [0, \dots, N]$, we extract the subset $\Lambda_n$ of multi-indices with exactly $n$ nonzero entries and determine the minimal bounding multi-index $\bstau \in \mathbb{N}_0^n$ such that $\bsnu^s \leq \bstau$ for all $\bsnu \in \Lambda_n$. This step ensures that all the tensorized interpolation operators $(I^\bsnu)_{\bsnu \in \Lambda_n}$ can be efficiently assembled into a single, vectorized computation. In Algorithm \ref{alg:smolyak}, this is compactly expressed as the summation of all $(I^{\bsnu, s, \bstau})_{\bsnu \in \Lambda_n}$, but in practice, it corresponds to pre-allocating and incrementally populating large arrays for interpolation nodes, weights, and function values. The final interpolant $I^\Lambda$ is then assembled through a brief loop over a small number of high-throughput operations, ensuring computational efficiency.
 
 \begin{algorithm}[H]
   \caption{Construct the multivariate barycentric Smolyak interpolator $I^\Lambda$\\
@@ -155,15 +155,15 @@ We now have everything in place to construct the Smolyak interpolant in a form t
   \begin{algorithmic}[1]
     \State $I^\Lambda = 0$
     \State $\Lambda_\zeta = \set{\bsnu \in \Lambda}{\zeta_{\Lambda, \bsnu} \neq 0}$
-    \State $K = \max \set{d_\bsnu}{\bsnu \in \Lambda_\zeta}$
-    \For{$k \in \{1, \dots, K\}$}
-      \State $\Lambda_k = (\bsnu : \bsnu \in \Lambda_\zeta, \ d_\bsnu = k)$
-      \State $\bstau = \left(\max (\set{\nu^t_i}{\bsnu \in \Lambda_k})\right)_{i=1}^k$
-      \State $I^{\Lambda, k} = 0$
-      \For{$\bsnu \in \Lambda_k$}
-        \State $I^{\Lambda, k} += \zeta_{\Lambda, \bsnu} I^{\bsnu, t, \bstau}$
+    \State $N = \max \set{d_\bsnu}{\bsnu \in \Lambda_\zeta}$
+    \For{$n \in \{0, \dots, N\}$}
+      \State $\Lambda_n = (\bsnu : \bsnu \in \Lambda_\zeta, \ d_\bsnu = n)$
+      \State $\bstau = \left(\max (\set{\nu^s_i}{\bsnu \in \Lambda_n})\right)_{i=1}^n$
+      \State $I^{\Lambda, n} = 0$
+      \For{$\bsnu \in \Lambda_n$}
+        \State $I^{\Lambda, n} += \zeta_{\Lambda, \bsnu} I^{\bsnu, s, \bstau}$
       \EndFor
-    \State $I^\Lambda += I^{\Lambda, k}$
+    \State $I^\Lambda += I^{\Lambda, n}$
     \EndFor
     \State
     \Return $I^\Lambda$
@@ -177,7 +177,7 @@ The library provides interpolation capabilities for arbitrary multivariate and v
 The quality of the interpolation depends on the smoothness of $f$ and the choice of interpolation nodes $\xi$ and multi-index sets $\Lambda$. Suitable choices have been extensively studied in the literature (see, e.g., **[TODO:  references]**).
 
 This repository includes generators for Leja and Gauss-Hermite interpolation nodes, as well as multi-index sets of the form
-$$\Lambda_{\bsk, \ell} := \{\bsnu \in \mathbb{N}_0^{d_1} \ : \  \sum_{j=1}^{d_1} k_j \nu_j < \ell\}.$$
+$$\Lambda_{\bsk, t} := \{\bsnu \in \mathbb{N}_0^{d_1} \ : \  \sum_{j=1}^{d_1} k_j \nu_j < t\}.$$
 where $\bsk \in \mathbb{R}^{d_1}$ satisfies $k_j \le k_{j+1}$ for all $j=1, \dots, d_1 - 1$. In the special case $\bsk = (1)_{j=1}^{d_1}$, this reduces to the classical total-degree multi-index set.
 
 Additional interpolation nodes or multi-index sets can be incorporated with minimal effort by implementing a minimalistic interface.

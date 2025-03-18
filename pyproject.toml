@@ -21,7 +21,8 @@ dev = [
     "pytest",
     "pytype",
     "black",
-    "flake8"
+    "flake8",
+    "flake8-pyproject"
 ]
 
 [tool.black]
@@ -29,7 +30,8 @@ line-length = 88
 target-version = ['py311']
 
 [tool.flake8]
-max-line-length = 88
+max-line-length = 120
+extend-ignore = """E203"""
 
 [tool.pytype]
 python_version = "3.11"
