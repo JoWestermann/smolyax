@@ -4,7 +4,7 @@ from typing import Callable
 import numpy as np
 from numpy.typing import ArrayLike
 
-from . import indices
+from . import barycentric, indices
 
 np.seterr(divide="raise")
 
@@ -21,12 +21,7 @@ class TensorProductBarycentricInterpolator:
         self.gens = gens
         self.adims = list(degrees.keys())
         self.nodes = [gens[i](k) for i, k in degrees.items()]
-        self.weights = [
-            np.array(
-                [1 / np.prod([nj - nk for nk in nodes if nk != nj]) for nj in nodes]
-            )
-            for nodes in self.nodes
-        ]
+        self.weights = [barycentric.compute_weights(nodes) for nodes in self.nodes]
         self.x = gens.get_zero()
         # F is the array containing evaluations of the target f
         # NOTE: For efficiency, we index only dimensions that have a degree larger than 0.

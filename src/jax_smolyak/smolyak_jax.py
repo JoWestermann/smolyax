@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import numpy as np
 from numpy.typing import ArrayLike
 
-from . import indices
+from . import barycentric, indices
 
 jax.config.update("jax_enable_x64", True)
 
@@ -118,10 +118,9 @@ class MultivariateSmolyakBarycentricInterpolator:
                     dim = adims[o]
                     nodes = g[dim](nu[dim])
                     self.data[n]["xi"][t][i][: len(nodes)] = nodes
-                    self.data[n]["w"][t][i][: len(nodes)] = [
-                        1 / np.prod([nj - nk for nk in nodes if nk != nj])
-                        for nj in nodes
-                    ]
+                    self.data[n]["w"][t][i][: len(nodes)] = barycentric.compute_weights(
+                        nodes
+                    )
 
         # Other variables, info, etc
         self.zero = g.get_zero()
