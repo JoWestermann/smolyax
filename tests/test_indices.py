@@ -13,32 +13,32 @@ def get_random_indexsets(nested: bool = False):
     k = np.log([a + b * i for i in range(d)]) / np.log(a)
 
     n_t = np.random.randint(low=1, high=100)
-    l = indices.find_suitable_t(k, n_t, nested=nested)
+    t = indices.find_suitable_t(k, n_t, nested=nested)
 
-    isparse = indices.indexset_sparse(lambda j: k[j], l, cutoff=d)
-    idense = indices.indexset_dense(k, l)
+    isparse = indices.indexset_sparse(lambda j: k[j], t, cutoff=d)
+    idense = indices.indexset_dense(k, t)
     print(
         f"\tConstructed {d}-dimensional multi-index sets with a={a}, b={b} and target n={n_t}. "
         + f"Sets are of cardinality {len(isparse)}."
     )
-    return k, l, isparse, idense
+    return k, t, isparse, idense
 
 
 def test_validity_of_indexsets():
     print("Testing that index sets contain the correct multi-indices and none extra.")
 
     for i in range(10):
-        k, l, isparse, idense = get_random_indexsets(nested=(i % 2) == 0)
+        k, t, isparse, idense = get_random_indexsets(nested=(i % 2) == 0)
 
         for idx_dense in it.product(*[range(int(np.floor(ki)) + 2) for ki in k]):
-            assert (idx_dense in idense) == (np.dot(idx_dense, k) < l), (
-                f"Assertion failed with\n k = {k}, l = {l},\n idx = {idx_dense},\n idx*k = {np.dot(idx_dense, k)}, "
-                + f"\n (idx in i) = {idx_dense in idense},\n np.dot(idx, k) < l = {np.dot(idx_dense, k) < l}"
+            assert (idx_dense in idense) == (np.dot(idx_dense, k) < t), (
+                f"Assertion failed with\n k = {k}, t = {t},\n idx = {idx_dense},\n idx*k = {np.dot(idx_dense, k)}, "
+                + f"\n (idx in i) = {idx_dense in idense},\n np.dot(idx, k) < t = {np.dot(idx_dense, k) < t}"
             )
             idx_sparse = indices.dense_index_to_sparse(idx_dense)
-            assert (idx_sparse in isparse) == (np.dot(idx_dense, k) < l), (
-                f"Assertion failed with\n k = {k}, l = {l},\n idx = {idx_dense},\n idx*k = {np.dot(idx_dense, k)}, "
-                + f"\n (idx in i) = {idx_sparse in isparse},\n np.dot(idx, k) < l = {np.dot(idx_dense, k) < l}"
+            assert (idx_sparse in isparse) == (np.dot(idx_dense, k) < t), (
+                f"Assertion failed with\n k = {k}, t = {t},\n idx = {idx_dense},\n idx*k = {np.dot(idx_dense, k)}, "
+                + f"\n (idx in i) = {idx_sparse in isparse},\n np.dot(idx, k) < t = {np.dot(idx_dense, k) < t}"
             )
 
 
@@ -48,7 +48,7 @@ def test_equality_of_sparse_and_dense_indexsets():
     )
 
     for i in range(10):
-        k, l, isparse, idense = get_random_indexsets(nested=(i % 2) == 0)
+        k, _, isparse, idense = get_random_indexsets(nested=(i % 2) == 0)
 
         for nu in isparse:
             nu_dense = indices.sparse_index_to_dense(nu, cutoff=len(k))
@@ -65,11 +65,11 @@ def test_smolyak_coefficients():
     )
 
     for i in range(10):
-        k, l, isparse, idense = get_random_indexsets(nested=(i % 2) == 0)
+        k, t, isparse, idense = get_random_indexsets(nested=(i % 2) == 0)
 
         for nu_1, nu_2 in zip(isparse, idense):
             c_1 = indices.smolyak_coefficient_zeta_sparse(
-                lambda j: k[j], l, nu=nu_1, cutoff=len(k)
+                lambda j: k[j], t, nu=nu_1, cutoff=len(k)
             )
-            c_2 = indices.smolyak_coefficient_zeta_dense(k, l, nu=nu_2)
+            c_2 = indices.smolyak_coefficient_zeta_dense(k, t, nu=nu_2)
             assert c_1 == c_2
