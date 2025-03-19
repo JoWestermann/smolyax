@@ -129,36 +129,48 @@ class MultivariateSmolyakBarycentricInterpolator:
                         nodes
                     )
 
-        # Other variables, info, etc
+        # Caching the interpolation node for nu = (0,0,...,0) for reuse in self.set_f
         self.zero = node_gen.get_zero()
+
+        # Tracking number of evaluations of the interpolation target f.
+        #   - self.n_f_evals tracks the total number of function evaluations used by the interpolator
+        #   - self.n_f_evals_new counts only new function calls.
+        # If evaluations are reused across interpolator instances, then likely self.n_f_evals_new < self.n_f_evals
         if self.is_nested:
-            self.n = len(indxs_all)
+            self.n_f_evals = len(indxs_all)
         else:
-            self.n = int(
+            self.n_f_evals = int(
                 np.sum([np.prod([si + 1 for si in idx.values()]) for idx in indxs_zeta])
             )
-        self.n_f_evals = 0
+        self.n_f_evals_new = 0
 
         if f is not None:
-            self.set_F(f=f, batchsize=batchsize)
+            self.set_f(f=f, batchsize=batchsize)
 
-    def set_F(self, *, f: Callable, F: dict = None, batchsize: int = 250) -> dict:
-        if F is None:
-            F = {}
+    def set_f(self, *, f: Callable, f_evals: dict = None, batchsize: int = 250) -> dict:
+        """
+        Compute (or reuse pre-computed) evaluations of the target function f at the interpolation nodes.
+        f : target function
+        f_evals : dictionary mapping interpolation nodes to function evaluations
+        batchsize : batchsize of interpolator input, used for pre-compiling __call__
+        returns : updated dictionary f_evals containing newly computed interpolation node to evaluation mappings
+        """
+        if f_evals is None:
+            f_evals = {}
 
         # Special case n = 0
         nu = indices.sparse_index_to_dense({}, self.d)
         if self.is_nested:
-            Fo = F
+            f_evals_nu = f_evals
         else:
-            Fo = F.get(nu, {})  # in this case, idx == degrees
-        if nu not in Fo.keys():
-            Fo[nu] = f(copy.deepcopy(self.zero))
-            self.n_f_evals += 1
-        self.offset *= Fo[nu]
+            f_evals_nu = f_evals.get(nu, {})  # in this case, idx == degrees
+        if nu not in f_evals_nu.keys():
+            f_evals_nu[nu] = f(copy.deepcopy(self.zero))
+            self.n_f_evals_new += 1
+        self.offset *= f_evals_nu[nu]
 
         if not self.is_nested:
-            F[nu] = Fo
+            f_evals[nu] = f_evals_nu
 
         # n > 0
         for n in self.data.keys():
@@ -167,21 +179,21 @@ class MultivariateSmolyakBarycentricInterpolator:
                 x = copy.deepcopy(self.zero)
 
                 if self.is_nested:
-                    Fo = F
+                    f_evals_nu = f_evals
                 else:
-                    Fo = F.get(degrees, {})
+                    f_evals_nu = f_evals.get(degrees, {})
 
                 for mu in it.product(*(range(d + 1) for d in degrees)):
                     ridx = tuple(mu[j] for j in self.data[n]["s"][i])
-                    if mu not in Fo.keys():
+                    if mu not in f_evals_nu.keys():
                         for k, (dim, deg) in enumerate(zip(self.data[n]["s"][i], ridx)):
                             x[dim] = self.data[n]["xi"][k][i][deg]
-                        Fo[mu] = f(x)
-                        self.n_f_evals += 1
-                    self.data[n]["F"][i][:, *ridx] = Fo[mu]
+                        f_evals_nu[mu] = f(x)
+                        self.n_f_evals_new += 1
+                    self.data[n]["F"][i][:, *ridx] = f_evals_nu[mu]
 
                 if not self.is_nested:
-                    F[degrees] = Fo
+                    f_evals[degrees] = f_evals_nu
 
             # cast to jnp data structures
             self.data[n]["F"] = jnp.array(self.data[n]["F"])
@@ -191,7 +203,7 @@ class MultivariateSmolyakBarycentricInterpolator:
 
         self.__compile_for_batchsize(batchsize)
 
-        return F
+        return f_evals
 
     def __compile_for_batchsize(self, batchsize: int) -> None:
         for k in self.data.keys():

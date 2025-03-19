@@ -41,36 +41,36 @@ class SmolyakBarycentricInterpolator:
         if f is not None:
             self.set_F(f)
 
-    def set_F(self, f: Callable, F: dict = None, i: int = None):
-        if F is None:
-            F = {}
+    def set_F(self, f: Callable, f_evals: dict = None, i: int = None):
+        if f_evals is None:
+            f_evals = {}
         if self.is_nested:
             for o in self.operators:
                 for idx in it.product(*(range(d + 1) for d in o.degrees)):
                     ridx = o.reduced_index(idx)
-                    if idx not in F.keys():
+                    if idx not in f_evals.keys():
                         o.set_x(ridx)
-                        F[idx] = f(o.x)
+                        f_evals[idx] = f(o.x)
                         self.n_f_evals += 1
                     if i is None:
-                        o.F[ridx] = F[idx]
+                        o.F[ridx] = f_evals[idx]
                     else:
-                        o.F[ridx] = F[idx][i]
+                        o.F[ridx] = f_evals[idx][i]
         else:
             for o in self.operators:
-                Fo = F.get(o.degrees, {})
+                f_evals_o = f_evals.get(o.degrees, {})
                 for idx in it.product(*(range(d + 1) for d in o.degrees)):
                     ridx = o.reduced_index(idx)
-                    if idx not in Fo.keys():
+                    if idx not in f_evals_o.keys():
                         o.set_x(ridx)
-                        Fo[idx] = f(o.x)
+                        f_evals_o[idx] = f(o.x)
                         self.n_f_evals += 1
                     if i is None:
-                        o.F[ridx] = Fo[idx]
+                        o.F[ridx] = f_evals_o[idx]
                     else:
-                        o.F[ridx] = Fo[idx][i]
-                F[o.degrees] = Fo
-        return F
+                        o.F[ridx] = f_evals_o[idx][i]
+                f_evals[o.degrees] = f_evals_o
+        return f_evals
 
     def __call__(self, x: ArrayLike) -> ArrayLike:
         r = 0
@@ -93,17 +93,17 @@ class MultivariateSmolyakBarycentricInterpolator:
         self.n = max(c.n for c in self.components)
         self.F = None
         if f is not None:
-            self.set_F(f=f)
+            self.set_f(f=f)
 
-    def set_F(self, *, f: Callable, F=None):
+    def set_f(self, *, f: Callable, f_evals=None):
         assert self.F is None
-        if F is None:
-            F = {}
+        if f_evals is None:
+            f_evals = {}
         for i, c in enumerate(self.components):
-            F = c.set_F(f, F, i)
-        self.F = F
+            f_evals = c.set_F(f, f_evals, i)
+        self.F = f_evals
 
-        return F
+        return f_evals
 
     def __call__(self, x: ArrayLike) -> ArrayLike:
         res = np.array([c(x) for c in self.components]).T

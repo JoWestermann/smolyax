@@ -28,13 +28,13 @@ class TensorProductBarycentricInterpolator:
         self.ordering = np.argsort([len(nodes) for nodes in self.nodes])[::-1]
         self.F = np.zeros(tuple(len(self.nodes[o]) for o in self.ordering))
         if f is not None:
-            self.set_F(f)
+            self.set_f(f)
 
     def set_x(self, ridx):
         for o, i in zip(self.ordering, ridx):
             self.x[self.adims[o]] = self.nodes[o][i]
 
-    def set_F(self, f: Callable):
+    def set_f(self, f: Callable):
         """Evaluate the target function f at all interpolation nodes"""
         for ridx in it.product(*(range(d) for d in self.F.shape)):
             self.set_x(ridx)

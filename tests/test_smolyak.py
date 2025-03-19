@@ -45,7 +45,7 @@ def test_smolyak_vector():
         f = setup.generate_test_function_smolyak(
             node_gen=node_gen, k=k, t=t, d_out=d_out
         )
-        ip.set_F(f=f)
+        ip.set_f(f=f)
 
         for n in range(5):
             x = node_gen.get_random(n=np.random.randint(low=1, high=5))
