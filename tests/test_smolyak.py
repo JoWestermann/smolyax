@@ -21,7 +21,7 @@ def test_smolyak_scalar():
         def f(x):
             return np.squeeze(ff(x))
 
-        ip.set_F(f)
+        ip.set_f(f)
 
         for n in range(5):
             x = node_gen.get_random(n=np.random.randint(low=1, high=5))

@@ -17,6 +17,12 @@ class SmolyakBarycentricInterpolator:
     def __init__(
         self, node_gen: nodes.Generator, k: ArrayLike, t: float, f: Callable = None
     ):
+        """
+        node_gen : interpolation node generator object
+        k : weight vector of the anisotropy of the multi-index set (TODO: move construction of multi-index outside)
+        t : threshold controlling the size of the multi-index set
+        f : interpolation target function
+        """
         self.k = k
         self.operators = []
         self.coefficients = []
@@ -39,9 +45,15 @@ class SmolyakBarycentricInterpolator:
             self.n = int(np.sum([np.prod(o.F.shape) for o in self.operators]))
         self.n_f_evals = 0
         if f is not None:
-            self.set_F(f)
+            self.set_f(f)
 
-    def set_F(self, f: Callable, f_evals: dict = None, i: int = None):
+    def set_f(self, f: Callable, f_evals: dict = None, i: int = None):
+        """
+        Compute (or reuse pre-computed) evaluations of the target function f at the interpolation nodes.
+        f : interpolation target function
+        f_evals : dictionary mapping interpolation nodes to function evaluations
+        i : index to access a specific dimension of the output (e.g. as used by MultivariateSmolyakBarycentricInterpolator)
+        """
         if f_evals is None:
             f_evals = {}
         if self.is_nested:
@@ -89,6 +101,12 @@ class MultivariateSmolyakBarycentricInterpolator:
         t: ArrayLike,
         f: Callable = None,
     ):
+        """
+        node_gen : interpolation node generator object
+        k : weight vector of the anisotropy of the multi-index set (TODO: move construction of multi-index outside)
+        t : threshold controlling the size of the multi-index set
+        f : interpolation target function
+        """
         self.components = [SmolyakBarycentricInterpolator(node_gen, k, ti) for ti in t]
         self.n = max(c.n for c in self.components)
         self.F = None
@@ -96,11 +114,16 @@ class MultivariateSmolyakBarycentricInterpolator:
             self.set_f(f=f)
 
     def set_f(self, *, f: Callable, f_evals=None):
+        """
+        Compute (or reuse pre-computed) evaluations of the target function f at the interpolation nodes.
+        f : interpolation target function
+        f_evals : dictionary mapping interpolation nodes to function evaluations
+        """
         assert self.F is None
         if f_evals is None:
             f_evals = {}
         for i, c in enumerate(self.components):
-            f_evals = c.set_F(f, f_evals, i)
+            f_evals = c.set_f(f, f_evals, i)
         self.F = f_evals
 
         return f_evals

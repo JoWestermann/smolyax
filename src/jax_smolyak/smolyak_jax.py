@@ -57,9 +57,10 @@ class MultivariateSmolyakBarycentricInterpolator:
         batchsize: int = 250,
     ) -> None:
         """
-        g : node generator object
+        node_gen : interpolation node generator object
         k : weight vector of the anisotropy of the multi-index set (TODO: move construction of multi-index outside)
         t : threshold controlling the size of the multi-index set
+        f : interpolation target function
         d_out : dimension of the output of the target function f
         """
         self.d = len(k)
@@ -150,7 +151,7 @@ class MultivariateSmolyakBarycentricInterpolator:
     def set_f(self, *, f: Callable, f_evals: dict = None, batchsize: int = 250) -> dict:
         """
         Compute (or reuse pre-computed) evaluations of the target function f at the interpolation nodes.
-        f : target function
+        f : interpolation target function
         f_evals : dictionary mapping interpolation nodes to function evaluations
         batchsize : batchsize of interpolator input, used for pre-compiling __call__
         returns : updated dictionary f_evals containing newly computed interpolation node to evaluation mappings
