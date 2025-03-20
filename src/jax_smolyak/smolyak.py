@@ -52,7 +52,8 @@ class SmolyakBarycentricInterpolator:
         Compute (or reuse pre-computed) evaluations of the target function f at the interpolation nodes.
         f : interpolation target function
         f_evals : dictionary mapping interpolation nodes to function evaluations
-        i : index to access a specific dimension of the output (e.g. as used by MultivariateSmolyakBarycentricInterpolator)
+        i : index to access a specific dimension of the output (e.g. as used by
+            MultivariateSmolyakBarycentricInterpolator)
         """
         if f_evals is None:
             f_evals = {}
