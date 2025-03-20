@@ -8,13 +8,14 @@ class Leja1D(Generator):
     """Leja grid points"""
 
     nodes = np.array([0, 1, -1, 1 / np.sqrt(2), -1 / np.sqrt(2)])
-    _reference_domain = (-1, 1)
 
-    def __init__(self, domain: ArrayLike) -> None:
+    def __init__(self, domain: ArrayLike = None) -> None:
         super().__init__(dim=1, is_nested=True)
-        if domain is None:
-            domain = self._reference_domain
         self.domain = domain
+        self._reference_domain = None
+        if domain is not None:
+            self.domain = np.array(domain)
+            self._reference_domain = (-1, 1)
 
     def __repr__(self) -> str:
         return f"Leja (domain = {self.domain})"
@@ -32,9 +33,7 @@ class Leja1D(Generator):
 
     def __call__(self, n: int) -> ArrayLike:
         self._ensure_nodes(n)
-        if self.domain is None:
-            return self.nodes[: n + 1]
-        return self.scale(self.nodes[: n + 1], self._reference_domain, self.domain)
+        return self.scale(self.nodes[: n + 1])
 
     def scale(
         self, x: ArrayLike, d1: ArrayLike = None, d2: ArrayLike = None
@@ -48,6 +47,10 @@ class Leja1D(Generator):
             d1 = self._reference_domain
         if d2 is None:
             d2 = self.domain
+
+        assert (d1 is None) == (d2 is None)
+        if d1 is None:  # no scaling if no custom domains are give
+            return x
 
         # ensure d1, d2 have shape (2, )
         d1, d2 = np.squeeze(d1), np.squeeze(d2)
@@ -83,22 +86,22 @@ class Leja1D(Generator):
         return self.scale(x, d1=self.domain, d2=self._reference_domain)
 
     def get_random(self, n: int = 1):
-        if self.domain is None:
-            return np.random.uniform(-1, 1, n)
-        return np.random.uniform(self.domain[0], self.domain[1], n)
+        return self.scale(np.random.uniform(-1, 1, n))
 
 
 class Leja(GeneratorMultiD):
 
-    def __init__(self, *, domains: ArrayLike = None, d: int = None):
+    def __init__(self, *, domains: ArrayLike = None, dim: int = None):
+        self.domains = None
+        self._reference_domains = None
         if domains is not None:
             GeneratorMultiD.__init__(self, [Leja1D(domain) for domain in domains])
-        elif d is not None:
-            GeneratorMultiD.__init__(self, [Leja1D(domain=(-1, 1)) for _ in range(d)])
+            self.domains = np.array(domains)
+            self._reference_domains = np.array([[-1, 1]] * len(domains))
+        elif dim is not None:
+            GeneratorMultiD.__init__(self, [Leja1D() for _ in range(dim)])
         else:
             raise
-        self.domains = np.array(domains)
-        self._reference_domains = np.array([[-1, 1]] * len(domains))
 
     def __repr__(self) -> str:
         return f"Leja (d = {self.dim}, domains = {self.domains.tolist()})"
@@ -118,6 +121,10 @@ class Leja(GeneratorMultiD):
             d1 = self._reference_domains
         if d2 is None:
             d2 = self.domains
+
+        assert (d1 is None) == (d2 is None)
+        if d1 is None:  # no scaling if no custom domains are given
+            return x
 
         # ensure d1, d2 have shape (d, 2)
         d1, d2 = np.array(d1), np.array(d2)

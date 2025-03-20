@@ -31,10 +31,27 @@ class GaussHermite1D(Generator):
 
 class GaussHermite(GeneratorMultiD):
 
-    def __init__(self, mlist: ArrayLike, alist: ArrayLike):
+    def __init__(
+        self, mlist: ArrayLike = None, alist: ArrayLike = None, dim: int = None
+    ):
+        dim = dim
+        if dim is None:
+            if alist is not None:
+                dim = len(alist)
+            elif mlist is not None:
+                dim = len(mlist)
+            else:
+                raise
+
+        if mlist is None:
+            mlist = np.zeros(dim)
+        if alist is None:
+            alist = np.ones(dim)
+
         GeneratorMultiD.__init__(
             self, [GaussHermite1D(m, a) for m, a in zip(mlist, alist)]
         )
+
         self.mean = np.array(mlist)
         self.scaling = np.array(alist)
 

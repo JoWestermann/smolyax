@@ -8,8 +8,15 @@ from numpy.typing import ArrayLike
 from jax_smolyak import indices, nodes
 
 
-def generate_nodes(*, n: int, dmin: int, dmax: int) -> List[nodes.Generator]:
+def generate_nodes_default(*, dmin: int, dmax: int) -> List[nodes.Generator]:
+    sets = []
+    for d in range(dmin, dmax + 1):
+        sets.append(nodes.Leja(dim=d))
+        sets.append(nodes.GaussHermite(dim=d))
+    return sets
 
+
+def generate_nodes(*, n: int, dmin: int, dmax: int) -> List[nodes.Generator]:
     sets = []
     for _ in range(n):
 
