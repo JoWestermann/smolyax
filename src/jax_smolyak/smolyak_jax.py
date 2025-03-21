@@ -115,15 +115,13 @@ class MultivariateSmolyakBarycentricInterpolator:
             self.data[n]["s"] = np.zeros((nn, n), dtype=int)
 
             for i, nu in enumerate(self.n_2_lambda_n[n]):
-                adims = list(nu.keys())  # active dimensions
-                ordering = sorted(
-                    range(n), key=lambda i: list(nu.values())[i], reverse=True
-                )
+                adims = sorted(
+                    nu, key=lambda dim: nu[dim], reverse=True
+                )  # sorted active dimensions
 
-                self.data[n]["s"][i] = [adims[o] for o in ordering]
+                self.data[n]["s"][i] = adims
 
-                for t, o in enumerate(ordering):
-                    dim = adims[o]
+                for t, dim in enumerate(adims):
                     nodes = node_gen[dim](nu[dim])
                     self.data[n]["xi"][t][i][: len(nodes)] = nodes
                     self.data[n]["w"][t][i][: len(nodes)] = barycentric.compute_weights(
