@@ -157,41 +157,48 @@ class MultivariateSmolyakBarycentricInterpolator:
             f_evals = {}
 
         # Special case n = 0
-        nu = indices.sparse_index_to_dense({}, self.d)
+        nu_tuple = indices.sparse_index_to_tuple({})
         if self.is_nested:
             f_evals_nu = f_evals
         else:
-            f_evals_nu = f_evals.get(nu, {})  # in this case, idx == degrees
-        if nu not in f_evals_nu.keys():
-            f_evals_nu[nu] = f(self.zero.copy())
+            f_evals_nu = f_evals.get(nu_tuple, {})
+        if nu_tuple not in f_evals_nu.keys():
+            f_evals_nu[nu_tuple] = f(self.zero.copy())
             self.n_f_evals_new += 1
-        self.offset *= f_evals_nu[nu]
+        self.offset *= f_evals_nu[nu_tuple]
 
         if not self.is_nested:
-            f_evals[nu] = f_evals_nu
+            f_evals[nu_tuple] = f_evals_nu
 
         # n > 0
         for n in self.data.keys():
             for i, nu in enumerate(self.n_2_lambda_n[n]):
-                degrees = indices.sparse_index_to_dense(nu, self.d)
                 x = self.zero.copy()
 
+                nu_tuple = indices.sparse_index_to_tuple(nu)
                 if self.is_nested:
                     f_evals_nu = f_evals
                 else:
-                    f_evals_nu = f_evals.get(degrees, {})
+                    f_evals_nu = f_evals.get(nu_tuple, {})
 
-                for mu in it.product(*(range(d + 1) for d in degrees)):
-                    ridx = tuple(mu[j] for j in self.data[n]["s"][i])
-                    if mu not in f_evals_nu.keys():
-                        for k, (dim, deg) in enumerate(zip(self.data[n]["s"][i], ridx)):
-                            x[dim] = self.data[n]["xi"][k][i][deg]
-                        f_evals_nu[mu] = f(x)
+                s_i = self.data[n]["s"][i]
+                F_i = self.data[n]["F"][i]
+                xi = self.data[n]["xi"]
+
+                sorted_s_i = sorted(s_i)
+                for mu_degrees in it.product(*(range(nu[j] + 1) for j in s_i)):
+                    mu_tuple = tuple(zip(sorted_s_i, mu_degrees))
+                    if mu_tuple not in f_evals_nu:
+                        x[s_i] = [
+                            xi[k][i][deg]
+                            for k, (dim, deg) in enumerate(zip(s_i, mu_degrees))
+                        ]
+                        f_evals_nu[mu_tuple] = f(x)
                         self.n_f_evals_new += 1
-                    self.data[n]["F"][i][:, *ridx] = f_evals_nu[mu]
+                    F_i[:, *mu_degrees] = f_evals_nu[mu_tuple]
 
                 if not self.is_nested:
-                    f_evals[degrees] = f_evals_nu
+                    f_evals[nu_tuple] = f_evals_nu
 
             # cast to jnp data structures
             self.data[n]["F"] = jnp.array(self.data[n]["F"])
