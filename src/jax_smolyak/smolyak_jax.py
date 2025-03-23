@@ -1,4 +1,3 @@
-import copy
 import itertools as it
 from typing import Callable, List
 
@@ -164,7 +163,7 @@ class MultivariateSmolyakBarycentricInterpolator:
         else:
             f_evals_nu = f_evals.get(nu, {})  # in this case, idx == degrees
         if nu not in f_evals_nu.keys():
-            f_evals_nu[nu] = f(copy.deepcopy(self.zero))
+            f_evals_nu[nu] = f(self.zero.copy())
             self.n_f_evals_new += 1
         self.offset *= f_evals_nu[nu]
 
@@ -175,7 +174,7 @@ class MultivariateSmolyakBarycentricInterpolator:
         for n in self.data.keys():
             for i, nu in enumerate(self.n_2_lambda_n[n]):
                 degrees = indices.sparse_index_to_dense(nu, self.d)
-                x = copy.deepcopy(self.zero)
+                x = self.zero.copy()
 
                 if self.is_nested:
                     f_evals_nu = f_evals
