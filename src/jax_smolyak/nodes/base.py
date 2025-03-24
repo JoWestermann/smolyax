@@ -6,7 +6,7 @@ from numpy.typing import ArrayLike
 
 
 class Generator(ABC):
-    """Abstract base class for interpolation points"""
+    """Abstract base class for univariate interpolation points"""
 
     def __init__(self, dim: int, is_nested: bool) -> None:
         self._dim = dim
@@ -48,6 +48,7 @@ class Generator(ABC):
 
 
 class GeneratorMultiD(Generator):
+    """Abstract base class for multivariate interpolation points"""
 
     def __init__(self, node_gens: List[Generator]):
         assert all(g.is_nested == node_gens[0].is_nested for g in node_gens)
