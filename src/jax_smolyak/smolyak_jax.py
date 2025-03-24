@@ -72,7 +72,7 @@ class MultivariateSmolyakBarycentricInterpolator:
         indxs_zeta = []
         for nu in indxs_all:
             zeta = indices.smolyak_coefficient_zeta_sparse(
-                lambda j: k[j], t, nu=nu, cutoff=self.d
+                k, t, nu=nu, cutoff=self.d
             )
             if zeta != 0:
                 zetas.append(zeta)
