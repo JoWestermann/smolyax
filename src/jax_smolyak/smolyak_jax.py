@@ -68,7 +68,7 @@ class MultivariateSmolyakBarycentricInterpolator:
 
         # Compute coefficients and multi-indices of the Smolyak Operator
         zetas = []
-        indxs_all = indices.indexset_sparse(lambda j: k[j], t, cutoff=self.d)
+        indxs_all = indices.indexset_sparse(k, t, cutoff=self.d)
         indxs_zeta = []
         for nu in indxs_all:
             zeta = indices.smolyak_coefficient_zeta_sparse(

@@ -41,13 +41,13 @@ def indexset_sparse(
     if cutoff is not None and i >= cutoff:
         return [nu]
     r = []
-    if (cutoff is None or i + 1 < cutoff) and k(i + 1) < t:
+    if (cutoff is None or i + 1 < cutoff) and k[i + 1] < t:
         r += indexset_sparse(k, t, i + 1, nu, cutoff=cutoff)
     else:
         r += [nu]
     j = 1
-    while j * k(i) < t:
-        r += indexset_sparse(k, t - j * k(i), i + 1, {**nu, i: j}, cutoff=cutoff)
+    while j * k[i] < t:
+        r += indexset_sparse(k, t - j * k[i], i + 1, {**nu, i: j}, cutoff=cutoff)
         j += 1
     return r
 
@@ -56,16 +56,16 @@ def abs_e_sparse(k, t, i=0, e=None, *, nu: dict[int, int] = None, cutoff: int = 
     if e is None:
         assert i == 0 and nu is not None
         e = 0
-        t -= np.sum([nu[j] * k(j) for j in nu.keys()])
+        t -= np.sum([nu[j] * k[j] for j in nu.keys()])
     if cutoff is not None and i >= cutoff:
         return [e]
     r = []
-    if (cutoff is None or i + 1 < cutoff) and k(i + 1) < t:
+    if (cutoff is None or i + 1 < cutoff) and k[i + 1] < t:
         r += abs_e_sparse(k, t, i + 1, e, cutoff=cutoff)
     else:
         r += [e]
-    if k(i) < t:
-        r += abs_e_sparse(k, t - k(i), i + 1, e + 1, cutoff=cutoff)
+    if k[i] < t:
+        r += abs_e_sparse(k, t - k[i], i + 1, e + 1, cutoff=cutoff)
     return r
 
 
@@ -98,15 +98,15 @@ def dense_index_to_sparse(dense_nu: ArrayLike) -> dict[int, int]:
     return sparse_nu
 
 
-def cardinality(kmap, t: float, cutoff: int, nested: bool = False) -> int:
-    iset = indexset_sparse(kmap, t, cutoff=cutoff)
+def cardinality(k, t: float, cutoff: int, nested: bool = False) -> int:
+    iset = indexset_sparse(k, t, cutoff=cutoff)
 
     if nested:
         return len(iset)
 
     n = 0
     for nu in iset:
-        c = np.sum([(-1) ** e for e in abs_e_sparse(kmap, t, nu=nu, cutoff=cutoff)])
+        c = np.sum([(-1) ** e for e in abs_e_sparse(k, t, nu=nu, cutoff=cutoff)])
         if c != 0:
             n += np.prod([v + 1 for v in nu.values()])
     return n
@@ -120,9 +120,6 @@ def find_suitable_t(k: ArrayLike, m: int = 50, nested: bool = False) -> int:
     """
     assert m > 0
 
-    def kmap(j):
-        return k[j]
-
     cutoff = len(k)
 
     if m == 1:
@@ -130,9 +127,9 @@ def find_suitable_t(k: ArrayLike, m: int = 50, nested: bool = False) -> int:
 
     # establish search interval
     l_interval = [1, 2]
-    while cardinality(kmap, l_interval[0], cutoff, nested) > m:
+    while cardinality(k, l_interval[0], cutoff, nested) > m:
         l_interval[0] /= 1.2
-    while cardinality(kmap, l_interval[1], cutoff, nested) < m:
+    while cardinality(k, l_interval[1], cutoff, nested) < m:
         l_interval[1] *= 1.2
 
     # bisect search interval
@@ -140,14 +137,14 @@ def find_suitable_t(k: ArrayLike, m: int = 50, nested: bool = False) -> int:
         return interval[0] + (interval[1] - interval[0]) / 2
 
     t_cand = midpoint(l_interval)
-    m_cand = cardinality(kmap, t_cand, cutoff, nested)
+    m_cand = cardinality(k, t_cand, cutoff, nested)
     for _ in range(32):
         if m_cand > m:
             l_interval = [l_interval[0], t_cand]
         else:
             l_interval = [t_cand, l_interval[1]]
         t_cand = midpoint(l_interval)
-        m_cand = cardinality(kmap, t_cand, cutoff, nested)
+        m_cand = cardinality(k, t_cand, cutoff, nested)
         if m_cand == m:
             break
     return t_cand
