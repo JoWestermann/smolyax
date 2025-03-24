@@ -52,8 +52,8 @@ class GaussHermite(GeneratorMultiD):
             self, [GaussHermite1D(m, a) for m, a in zip(mlist, alist)]
         )
 
-        self.mean = np.array(mlist)
-        self.scaling = np.array(alist)
+        self.mean = np.asarray(mlist)
+        self.scaling = np.asarray(alist)
 
     def __repr__(self) -> str:
         return (
