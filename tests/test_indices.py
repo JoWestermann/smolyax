@@ -43,9 +43,7 @@ def test_validity_of_indexsets():
 
 
 def test_equality_of_sparse_and_dense_indexsets():
-    print(
-        "Testing that the sparse and dense multi-index set implementations contain the same multi-indices."
-    )
+    print("Testing that the sparse and dense multi-index set implementations contain the same multi-indices.")
 
     for i in range(10):
         k, _, isparse, idense = get_random_indexsets(nested=(i % 2) == 0)
@@ -60,15 +58,12 @@ def test_equality_of_sparse_and_dense_indexsets():
 
 
 def test_smolyak_coefficients():
-    print(
-        "Testing that sparse and dense computation of the Smolyak coefficients coincide."
-    )
+    print("Testing that sparse and dense computation of the Smolyak coefficients coincide.")
 
     for i in range(10):
         k, t, isparse, idense = get_random_indexsets(nested=(i % 2) == 0)
 
         for nu_1, nu_2 in zip(isparse, idense):
-            c_1 = indices.smolyak_coefficient_zeta_sparse(k, t, nu=nu_1, cutoff=len(k)
-            )
+            c_1 = indices.smolyak_coefficient_zeta_sparse(k, t, nu=nu_1, cutoff=len(k))
             c_2 = indices.smolyak_coefficient_zeta_dense(k, t, nu=nu_2)
             assert c_1 == c_2

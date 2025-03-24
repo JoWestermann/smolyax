@@ -108,9 +108,7 @@ class MultivariateSmolyakBarycentricInterpolator:
             self.data[n]["s"] = np.zeros((nn, n), dtype=int)
 
             for i, nu in enumerate(self.n_2_lambda_n[n]):
-                adims = sorted(
-                    nu, key=lambda dim: nu[dim], reverse=True
-                )  # sorted active dimensions
+                adims = sorted(nu, key=lambda dim: nu[dim], reverse=True)  # sorted active dimensions
 
                 self.data[n]["s"][i] = adims
 
@@ -129,9 +127,7 @@ class MultivariateSmolyakBarycentricInterpolator:
         if self.is_nested:
             self.n_f_evals = len(indxs_all)
         else:
-            self.n_f_evals = int(
-                np.sum([np.prod([si + 1 for si in idx.values()]) for idx in indxs_zeta])
-            )
+            self.n_f_evals = int(np.sum([np.prod([si + 1 for si in idx.values()]) for idx in indxs_zeta]))
         self.n_f_evals_new = 0
 
         if f is not None:
@@ -181,10 +177,7 @@ class MultivariateSmolyakBarycentricInterpolator:
                 for mu_degrees in it.product(*(range(nu[j] + 1) for j in s_i)):
                     mu_tuple = tuple(zip(sorted_s_i, mu_degrees))
                     if mu_tuple not in f_evals_nu:
-                        x[s_i] = [
-                            xi[k][i][deg]
-                            for k, (dim, deg) in enumerate(zip(s_i, mu_degrees))
-                        ]
+                        x[s_i] = [xi[k][i][deg] for k, (dim, deg) in enumerate(zip(s_i, mu_degrees))]
                         f_evals_nu[mu_tuple] = f(x)
                         self.n_f_evals_new += 1
                     F_i[:, *mu_degrees] = f_evals_nu[mu_tuple]

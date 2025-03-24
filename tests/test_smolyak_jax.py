@@ -15,13 +15,9 @@ def test_smolyak_jax():
         t = np.random.randint(low=1, high=4)
         print(f"... with k = {k}, t = {t}, d_out = {d_out},", node_gen)
 
-        f = setup.generate_test_function_smolyak(
-            node_gen=node_gen, k=k, t=t, d_out=d_out
-        )
+        f = setup.generate_test_function_smolyak(node_gen=node_gen, k=k, t=t, d_out=d_out)
 
-        ip = MultivariateSmolyakBarycentricInterpolator(
-            node_gen=node_gen, k=k, t=t, d_out=d_out, batchsize=1, f=f
-        )
+        ip = MultivariateSmolyakBarycentricInterpolator(node_gen=node_gen, k=k, t=t, d_out=d_out, batchsize=1, f=f)
 
         for n in range(5):
             x = node_gen.get_random(n=np.random.randint(low=1, high=5))

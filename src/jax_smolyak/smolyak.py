@@ -14,9 +14,7 @@ class SmolyakBarycentricInterpolator:
     def is_nested(self) -> bool:
         return self._is_nested
 
-    def __init__(
-        self, node_gen: nodes.Generator, k: ArrayLike, t: float, f: Callable = None
-    ):
+    def __init__(self, node_gen: nodes.Generator, k: ArrayLike, t: float, f: Callable = None):
         """
         node_gen : interpolation node generator object
         k : weight vector of the anisotropy of the multi-index set (TODO: move construction of multi-index outside)
@@ -32,9 +30,7 @@ class SmolyakBarycentricInterpolator:
         for nu in i:
             c = indices.smolyak_coefficient_zeta_sparse(k, t, nu=nu, cutoff=len(k))
             if c != 0:
-                self.operators.append(
-                    TensorProductBarycentricInterpolator(node_gen, nu, len(k))
-                )
+                self.operators.append(TensorProductBarycentricInterpolator(node_gen, nu, len(k)))
                 self.coefficients.append(c)
         if self.is_nested:
             self.n = len(i)
