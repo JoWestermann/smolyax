@@ -25,9 +25,7 @@ def test_smolyak_scalar():
 
         for n in range(5):
             x = node_gen.get_random(n=np.random.randint(low=1, high=5))
-            assert np.allclose(
-                ip(x), f(x)
-            ), f"Assertion failed with\n x = {x}\n f(x) = {f(x)}\n ip(x) = {ip(x)}"
+            assert np.allclose(ip(x), f(x)), f"Assertion failed with\n x = {x}\n f(x) = {f(x)}\n ip(x) = {ip(x)}"
 
 
 def test_smolyak_vector():
@@ -42,9 +40,7 @@ def test_smolyak_vector():
         print(f"... with k = {k}, t = {np.array(t).tolist()},", node_gen)
 
         ip = MultivariateSmolyakBarycentricInterpolator(node_gen=node_gen, k=k, t=t)
-        f = setup.generate_test_function_smolyak(
-            node_gen=node_gen, k=k, t=t, d_out=d_out
-        )
+        f = setup.generate_test_function_smolyak(node_gen=node_gen, k=k, t=t, d_out=d_out)
         ip.set_f(f=f)
 
         for n in range(5):

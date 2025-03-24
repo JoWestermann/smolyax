@@ -68,12 +68,10 @@ class MultivariateSmolyakBarycentricInterpolator:
 
         # Compute coefficients and multi-indices of the Smolyak Operator
         zetas = []
-        indxs_all = indices.indexset_sparse(lambda j: k[j], t, cutoff=self.d)
+        indxs_all = indices.indexset_sparse(k, t, cutoff=self.d)
         indxs_zeta = []
         for nu in indxs_all:
-            zeta = indices.smolyak_coefficient_zeta_sparse(
-                lambda j: k[j], t, nu=nu, cutoff=self.d
-            )
+            zeta = indices.smolyak_coefficient_zeta_sparse(k, t, nu=nu, cutoff=self.d)
             if zeta != 0:
                 zetas.append(zeta)
                 indxs_zeta.append(nu)
@@ -85,9 +83,7 @@ class MultivariateSmolyakBarycentricInterpolator:
         for zeta, nu in zip(zetas, indxs_zeta):
             tau = tuple(sorted(nu.values(), reverse=True))
             n = len(tau)
-            self.n_2_tau[n] = tuple(
-                max(tau1, tau2) for tau1, tau2 in zip(self.n_2_tau.get(n, tau), tau)
-            )
+            self.n_2_tau[n] = tuple(max(tau1, tau2) for tau1, tau2 in zip(self.n_2_tau.get(n, tau), tau))
             self.n_2_lambda_n[n] = self.n_2_lambda_n.get(n, []) + [nu]
             self.n_2_zetas[n] = self.n_2_zetas.get(n, []) + [zeta]
 
@@ -106,26 +102,20 @@ class MultivariateSmolyakBarycentricInterpolator:
             if n not in self.data:
                 self.data[n] = {}
             self.data[n]["z"] = jnp.array(self.n_2_zetas[n])
-            self.data[n]["F"] = np.zeros(
-                (nn, d_out) + tuple(tau_i + 1 for tau_i in tau)
-            )
+            self.data[n]["F"] = np.zeros((nn, d_out) + tuple(tau_i + 1 for tau_i in tau))
             self.data[n]["xi"] = [np.zeros((nn, tau_i + 1)) for tau_i in tau]
             self.data[n]["w"] = [np.zeros((nn, tau_i + 1)) for tau_i in tau]
             self.data[n]["s"] = np.zeros((nn, n), dtype=int)
 
             for i, nu in enumerate(self.n_2_lambda_n[n]):
-                adims = sorted(
-                    nu, key=lambda dim: nu[dim], reverse=True
-                )  # sorted active dimensions
+                adims = sorted(nu, key=lambda dim: nu[dim], reverse=True)  # sorted active dimensions
 
                 self.data[n]["s"][i] = adims
 
                 for t, dim in enumerate(adims):
                     nodes = node_gen[dim](nu[dim])
                     self.data[n]["xi"][t][i][: len(nodes)] = nodes
-                    self.data[n]["w"][t][i][: len(nodes)] = barycentric.compute_weights(
-                        nodes
-                    )
+                    self.data[n]["w"][t][i][: len(nodes)] = barycentric.compute_weights(nodes)
 
         # Caching the interpolation node for nu = (0,0,...,0) for reuse in self.set_f
         self.zero = node_gen.get_zero()
@@ -137,9 +127,7 @@ class MultivariateSmolyakBarycentricInterpolator:
         if self.is_nested:
             self.n_f_evals = len(indxs_all)
         else:
-            self.n_f_evals = int(
-                np.sum([np.prod([si + 1 for si in idx.values()]) for idx in indxs_zeta])
-            )
+            self.n_f_evals = int(np.sum([np.prod([si + 1 for si in idx.values()]) for idx in indxs_zeta]))
         self.n_f_evals_new = 0
 
         if f is not None:
@@ -189,10 +177,7 @@ class MultivariateSmolyakBarycentricInterpolator:
                 for mu_degrees in it.product(*(range(nu[j] + 1) for j in s_i)):
                     mu_tuple = tuple(zip(sorted_s_i, mu_degrees))
                     if mu_tuple not in f_evals_nu:
-                        x[s_i] = [
-                            xi[k][i][deg]
-                            for k, (dim, deg) in enumerate(zip(s_i, mu_degrees))
-                        ]
+                        x[s_i] = [xi[k][i][deg] for k, (dim, deg) in enumerate(zip(s_i, mu_degrees))]
                         f_evals_nu[mu_tuple] = f(x)
                         self.n_f_evals_new += 1
                     F_i[:, *mu_degrees] = f_evals_nu[mu_tuple]
