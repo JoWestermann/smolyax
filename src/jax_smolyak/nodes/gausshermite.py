@@ -16,8 +16,7 @@ class GaussHermite1D(Generator):
         return f"Gauss-Hermite (mean = {self.mean}, scaling = {self.scaling})"
 
     def __call__(self, n: int) -> ArrayLike:
-        nodes = np.polynomial.hermite.hermgauss(n + 1)[0]
-        return self.scale(nodes)
+        return self.scale(np.polynomial.hermite.hermgauss(n + 1)[0])
 
     def scale(self, x: ArrayLike) -> ArrayLike:
         return self.mean + self.scaling * x
