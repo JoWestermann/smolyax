@@ -16,25 +16,25 @@ class TensorProductBarycentricInterpolator:
     (https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=9da00c0aedf5335927147df78eb5f6767edba968).
     """
 
-    def __init__(self, gens, degrees, d: int, f: Callable = None):
-        self.degrees = indices.sparse_index_to_dense(degrees, d)
-        self.gens = gens
-        self.adims = list(degrees.keys())
-        self.nodes = [gens[i](k) for i, k in degrees.items()]
+    def __init__(self, node_gen, nu, d: int, f: Callable = None):
+        self.degrees = indices.sparse_index_to_dense(nu, d)
+        self.node_gen = node_gen
+        self.adims = list(nu.keys())
+        self.nodes = [node_gen[i](k) for i, k in nu.items()]
         self.weights = [barycentric.compute_weights(nodes) for nodes in self.nodes]
-        self.x = gens.get_zero()
+        self.x = node_gen.get_zero()
         # F is the array containing evaluations of the target f
         # NOTE: For efficiency, we index only dimensions that have a degree larger than 0.
         self.ordering = np.argsort([len(nodes) for nodes in self.nodes])[::-1]
         self.F = np.zeros(tuple(len(self.nodes[o]) for o in self.ordering))
         if f is not None:
-            self.set_F(f)
+            self.set_f(f)
 
     def set_x(self, ridx):
         for o, i in zip(self.ordering, ridx):
             self.x[self.adims[o]] = self.nodes[o][i]
 
-    def set_F(self, f: Callable):
+    def set_f(self, f: Callable):
         """Evaluate the target function f at all interpolation nodes"""
         for ridx in it.product(*(range(d) for d in self.F.shape)):
             self.set_x(ridx)

@@ -1,4 +1,3 @@
-import copy
 import itertools as it
 from typing import Callable, List
 
@@ -7,7 +6,7 @@ import jax.numpy as jnp
 import numpy as np
 from numpy.typing import ArrayLike
 
-from . import barycentric, indices
+from . import barycentric, indices, nodes
 
 jax.config.update("jax_enable_x64", True)
 
@@ -47,17 +46,25 @@ class MultivariateSmolyakBarycentricInterpolator:
         return self._is_nested
 
     def __init__(
-        self, *, g, k, t, d_out: int, f: Callable = None, batchsize: int = 250
+        self,
+        *,
+        node_gen: nodes.Generator,
+        k: ArrayLike,
+        t: float,
+        d_out: int,
+        f: Callable = None,
+        batchsize: int = 250,
     ) -> None:
         """
-        g : node generator object
+        node_gen : interpolation node generator object
         k : weight vector of the anisotropy of the multi-index set (TODO: move construction of multi-index outside)
         t : threshold controlling the size of the multi-index set
+        f : interpolation target function
         d_out : dimension of the output of the target function f
         """
         self.d = len(k)
         self.d_out = d_out
-        self._is_nested = g.is_nested
+        self._is_nested = node_gen.is_nested
 
         # Compute coefficients and multi-indices of the Smolyak Operator
         zetas = []
@@ -107,74 +114,91 @@ class MultivariateSmolyakBarycentricInterpolator:
             self.data[n]["s"] = np.zeros((nn, n), dtype=int)
 
             for i, nu in enumerate(self.n_2_lambda_n[n]):
-                adims = list(nu.keys())  # active dimensions
-                ordering = sorted(
-                    range(n), key=lambda i: list(nu.values())[i], reverse=True
-                )
+                adims = sorted(
+                    nu, key=lambda dim: nu[dim], reverse=True
+                )  # sorted active dimensions
 
-                self.data[n]["s"][i] = [adims[o] for o in ordering]
+                self.data[n]["s"][i] = adims
 
-                for t, o in enumerate(ordering):
-                    dim = adims[o]
-                    nodes = g[dim](nu[dim])
+                for t, dim in enumerate(adims):
+                    nodes = node_gen[dim](nu[dim])
                     self.data[n]["xi"][t][i][: len(nodes)] = nodes
                     self.data[n]["w"][t][i][: len(nodes)] = barycentric.compute_weights(
                         nodes
                     )
 
-        # Other variables, info, etc
-        self.zero = g.get_zero()
+        # Caching the interpolation node for nu = (0,0,...,0) for reuse in self.set_f
+        self.zero = node_gen.get_zero()
+
+        # Tracking number of evaluations of the interpolation target f.
+        #   - self.n_f_evals tracks the total number of function evaluations used by the interpolator
+        #   - self.n_f_evals_new counts only new function calls.
+        # If evaluations are reused across interpolator instances, then likely self.n_f_evals_new < self.n_f_evals
         if self.is_nested:
-            self.n = len(indxs_all)
+            self.n_f_evals = len(indxs_all)
         else:
-            self.n = int(
+            self.n_f_evals = int(
                 np.sum([np.prod([si + 1 for si in idx.values()]) for idx in indxs_zeta])
             )
-        self.n_f_evals = 0
+        self.n_f_evals_new = 0
 
         if f is not None:
-            self.set_F(f=f, batchsize=batchsize)
+            self.set_f(f=f, batchsize=batchsize)
 
-    def set_F(self, *, f: Callable, F: dict = None, batchsize: int = 250) -> dict:
-        if F is None:
-            F = {}
+    def set_f(self, *, f: Callable, f_evals: dict = None, batchsize: int = 250) -> dict:
+        """
+        Compute (or reuse pre-computed) evaluations of the target function f at the interpolation nodes.
+        f : interpolation target function
+        f_evals : dictionary mapping interpolation nodes to function evaluations
+        batchsize : batchsize of interpolator input, used for pre-compiling __call__
+        returns : updated dictionary f_evals containing newly computed interpolation node to evaluation mappings
+        """
+        if f_evals is None:
+            f_evals = {}
 
         # Special case n = 0
-        nu = indices.sparse_index_to_dense({}, self.d)
+        nu_tuple = indices.sparse_index_to_tuple({})
         if self.is_nested:
-            Fo = F
+            f_evals_nu = f_evals
         else:
-            Fo = F.get(nu, {})  # in this case, idx == degrees
-        if nu not in Fo.keys():
-            Fo[nu] = f(copy.deepcopy(self.zero))
-            self.n_f_evals += 1
-        self.offset *= Fo[nu]
+            f_evals_nu = f_evals.get(nu_tuple, {})
+        if nu_tuple not in f_evals_nu.keys():
+            f_evals_nu[nu_tuple] = f(self.zero.copy())
+            self.n_f_evals_new += 1
+        self.offset *= f_evals_nu[nu_tuple]
 
         if not self.is_nested:
-            F[nu] = Fo
+            f_evals[nu_tuple] = f_evals_nu
 
         # n > 0
         for n in self.data.keys():
             for i, nu in enumerate(self.n_2_lambda_n[n]):
-                degrees = indices.sparse_index_to_dense(nu, self.d)
-                x = copy.deepcopy(self.zero)
+                x = self.zero.copy()
 
+                nu_tuple = indices.sparse_index_to_tuple(nu)
                 if self.is_nested:
-                    Fo = F
+                    f_evals_nu = f_evals
                 else:
-                    Fo = F.get(degrees, {})
+                    f_evals_nu = f_evals.get(nu_tuple, {})
 
-                for mu in it.product(*(range(d + 1) for d in degrees)):
-                    ridx = tuple(mu[j] for j in self.data[n]["s"][i])
-                    if mu not in Fo.keys():
-                        for k, (dim, deg) in enumerate(zip(self.data[n]["s"][i], ridx)):
-                            x[dim] = self.data[n]["xi"][k][i][deg]
-                        Fo[mu] = f(x)
-                        self.n_f_evals += 1
-                    self.data[n]["F"][i][:, *ridx] = Fo[mu]
+                s_i = self.data[n]["s"][i]
+                F_i = self.data[n]["F"][i]
+                xi = self.data[n]["xi"]
+
+                sorted_s_i = sorted(s_i)
+                for mu_degrees in it.product(*(range(nu[j] + 1) for j in s_i)):
+                    mu_tuple = tuple(zip(sorted_s_i, mu_degrees))
+                    if mu_tuple not in f_evals_nu:
+                        x[s_i] = [
+                            xi[k][i][deg]
+                            for k, (dim, deg) in enumerate(zip(s_i, mu_degrees))
+                        ]
+                        f_evals_nu[mu_tuple] = f(x)
+                        self.n_f_evals_new += 1
+                    F_i[:, *mu_degrees] = f_evals_nu[mu_tuple]
 
                 if not self.is_nested:
-                    F[degrees] = Fo
+                    f_evals[nu_tuple] = f_evals_nu
 
             # cast to jnp data structures
             self.data[n]["F"] = jnp.array(self.data[n]["F"])
@@ -184,7 +208,7 @@ class MultivariateSmolyakBarycentricInterpolator:
 
         self.__compile_for_batchsize(batchsize)
 
-        return F
+        return f_evals
 
     def __compile_for_batchsize(self, batchsize: int) -> None:
         for k in self.data.keys():

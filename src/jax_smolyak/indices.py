@@ -75,6 +75,12 @@ def smolyak_coefficient_zeta_sparse(
     return np.sum([(-1) ** e for e in abs_e_sparse(k, t, nu=nu, cutoff=cutoff)])
 
 
+def sparse_index_to_tuple(nu: dict[int, int], check: bool = False) -> tuple:
+    if check:
+        assert list(nu.keys()) == sorted(nu.keys())
+    return tuple(nu.items())
+
+
 def sparse_index_to_dense(nu: dict[int, int], cutoff: int = None) -> tuple:
     if cutoff is None:
         cutoff = max(nu.keys())
