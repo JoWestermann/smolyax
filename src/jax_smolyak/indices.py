@@ -33,9 +33,7 @@ def smolyak_coefficient_zeta_dense(k, t, *, nu):
     return np.sum([(-1) ** (np.sum(e)) for e in unitball(nu, k, t)])
 
 
-def indexset_sparse(
-    k, t: float, i: int = 0, nu: dict[int, int] = None, *, cutoff: int = None
-):
+def indexset_sparse(k, t: float, i: int = 0, nu: dict[int, int] = None, *, cutoff: int = None):
     if nu is None:
         nu = {}
     if cutoff is not None and i >= cutoff:
@@ -69,9 +67,7 @@ def abs_e_sparse(k, t, i=0, e=None, *, nu: dict[int, int] = None, cutoff: int = 
     return r
 
 
-def smolyak_coefficient_zeta_sparse(
-    k, t: float, *, nu: dict[int, int] = None, cutoff: int = None
-):
+def smolyak_coefficient_zeta_sparse(k, t: float, *, nu: dict[int, int] = None, cutoff: int = None):
     return np.sum([(-1) ** e for e in abs_e_sparse(k, t, nu=nu, cutoff=cutoff)])
 
 

@@ -35,9 +35,7 @@ class Leja1D(Generator):
         self._ensure_nodes(n)
         return self.scale(self.nodes[: n + 1])
 
-    def scale(
-        self, x: ArrayLike, d1: ArrayLike = None, d2: ArrayLike = None
-    ) -> ArrayLike:
+    def scale(self, x: ArrayLike, d1: ArrayLike = None, d2: ArrayLike = None) -> ArrayLike:
         """
         Affine transformation from the interval d1 to the interval d2 applied to point x.
         x : scalar or array or list of shape (n, )
@@ -54,9 +52,7 @@ class Leja1D(Generator):
 
         # ensure d1, d2 have shape (2, )
         d1, d2 = np.squeeze(d1), np.squeeze(d2)
-        assert (
-            d1.shape == d2.shape == (2,)
-        ), f"shapes {d1.shape} and {d2.shape} do not match (2, )"
+        assert d1.shape == d2.shape == (2,), f"shapes {d1.shape} and {d2.shape} do not match (2, )"
         assert d1[0] < d1[1]
         assert d2[0] < d2[1]
 
@@ -68,12 +64,8 @@ class Leja1D(Generator):
         # ensure x in d1
         valid_lower = (x >= d1[0]) | np.isclose(x, d1[0])
         valid_upper = (x <= d1[1]) | np.isclose(x, d1[1])
-        assert np.all(
-            valid_lower
-        ), f"Assertion failed: Some values are below lower bounds\n{x[~valid_lower]}"
-        assert np.all(
-            valid_upper
-        ), f"Assertion failed: Some values are above upper bounds\n{x[~valid_upper]}"
+        assert np.all(valid_lower), f"Assertion failed: Some values are below lower bounds\n{x[~valid_lower]}"
+        assert np.all(valid_upper), f"Assertion failed: Some values are above upper bounds\n{x[~valid_upper]}"
 
         # scale
         x = (x - d1[0]) / (d1[1] - d1[0])
@@ -109,9 +101,7 @@ class Leja(GeneratorMultiD):
     def scale_back(self, x: ArrayLike) -> ArrayLike:
         return self.scale(x, d1=self.domains, d2=self._reference_domains)
 
-    def scale(
-        self, x: ArrayLike, d1: ArrayLike = None, d2: ArrayLike = None
-    ) -> ArrayLike:
+    def scale(self, x: ArrayLike, d1: ArrayLike = None, d2: ArrayLike = None) -> ArrayLike:
         """
         Affine transformation from the interval d1 to the interval d2 applied to point x.
         x : array or list of shape (n, d) or (d, )
@@ -152,12 +142,8 @@ class Leja(GeneratorMultiD):
         # ensure x in d1
         valid_lower = (x >= d1[:, 0]) | np.isclose(x, d1[:, 0])
         valid_upper = (x <= d1[:, 1]) | np.isclose(x, d1[:, 1])
-        assert np.all(
-            valid_lower
-        ), f"Assertion failed: Some values are below lower bounds\n{x[~valid_lower]}"
-        assert np.all(
-            valid_upper
-        ), f"Assertion failed: Some values are above upper bounds\n{x[~valid_upper]}"
+        assert np.all(valid_lower), f"Assertion failed: Some values are below lower bounds\n{x[~valid_lower]}"
+        assert np.all(valid_upper), f"Assertion failed: Some values are above upper bounds\n{x[~valid_upper]}"
 
         # check
         assert len(x.shape) == len(d1.shape) == len(d2.shape) == 2
