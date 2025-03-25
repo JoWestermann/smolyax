@@ -15,7 +15,7 @@ def get_random_indexsets(nested: bool = False):
     n_t = np.random.randint(low=1, high=100)
     t = indices.find_suitable_t(k, n_t, nested=nested)
 
-    isparse = indices.indexset_sparse(k, t, cutoff=d)
+    isparse = indices.indexset_sparse(k, t)
     idense = indices.indexset_dense(k, t)
     print(
         f"\tConstructed {d}-dimensional multi-index sets with a={a}, b={b} and target n={n_t}. "
@@ -49,7 +49,7 @@ def test_equality_of_sparse_and_dense_indexsets():
         k, _, isparse, idense = get_random_indexsets(nested=(i % 2) == 0)
 
         for nu in isparse:
-            nu_dense = indices.sparse_index_to_dense(nu, cutoff=len(k))
+            nu_dense = indices.sparse_index_to_dense(nu, dim=len(k))
             assert nu_dense in idense, nu_dense
 
         for nu in idense:
@@ -64,6 +64,6 @@ def test_smolyak_coefficients():
         k, t, isparse, idense = get_random_indexsets(nested=(i % 2) == 0)
 
         for nu_1, nu_2 in zip(isparse, idense):
-            c_1 = indices.smolyak_coefficient_zeta_sparse(k, t, nu=nu_1, cutoff=len(k))
+            c_1 = indices.smolyak_coefficient_zeta_sparse(k, t, nu=nu_1)
             c_2 = indices.smolyak_coefficient_zeta_dense(k, t, nu=nu_2)
             assert c_1 == c_2

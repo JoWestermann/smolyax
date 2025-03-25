@@ -26,9 +26,9 @@ class SmolyakBarycentricInterpolator:
         self.coefficients = []
         self._is_nested = node_gen.is_nested
 
-        i = indices.indexset_sparse(k, t, cutoff=len(k))
+        i = indices.indexset_sparse(k, t)
         for nu in i:
-            c = indices.smolyak_coefficient_zeta_sparse(k, t, nu=nu, cutoff=len(k))
+            c = indices.smolyak_coefficient_zeta_sparse(k, t, nu=nu)
             if c != 0:
                 self.operators.append(TensorProductBarycentricInterpolator(node_gen, nu, len(k)))
                 self.coefficients.append(c)

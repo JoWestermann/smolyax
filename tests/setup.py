@@ -67,8 +67,8 @@ def generate_test_function_smolyak(*, node_gen: nodes.Generator, k: ArrayLike, t
 
     selected_idxs = []
     for ti in t:
-        idxs = indices.indexset_sparse(k, ti, cutoff=len(k))
+        idxs = indices.indexset_sparse(k, ti)
         j = np.random.randint(len(idxs))
-        selected_idxs.append(indices.sparse_index_to_dense(idxs[j], cutoff=len(k)))
+        selected_idxs.append(indices.sparse_index_to_dense(idxs[j], dim=len(k)))
     print("\t Test polynomials with degrees", selected_idxs)
     return lambda x: np.array([evaluate_multivariate_polynomial(node_gen, nu, x) for nu in selected_idxs]).T
