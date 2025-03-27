@@ -177,7 +177,7 @@ class MultivariateSmolyakBarycentricInterpolator:
                 for mu_degrees in it.product(*(range(nu[j] + 1) for j in s_i)):
                     mu_tuple = tuple(zip(sorted_s_i, mu_degrees))
                     if mu_tuple not in f_evals_nu:
-                        x[s_i] = [xi[k][i][deg] for k, (dim, deg) in enumerate(zip(s_i, mu_degrees))]
+                        x[s_i] = [xi_k[i][deg] for xi_k, deg in zip(xi, mu_degrees)]
                         f_evals_nu[mu_tuple] = f(x)
                         self.n_f_evals_new += 1
                     F_i[:, *mu_degrees] = f_evals_nu[mu_tuple]
