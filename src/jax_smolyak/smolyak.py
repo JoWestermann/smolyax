@@ -66,7 +66,7 @@ class MultivariateSmolyakBarycentricInterpolator:
         self.d_out = d_out
         self._is_nested = node_gen.is_nested
 
-        indxs_all = indices.indexset_sparse(k, t)
+        indxs_all = indices.indexset(k, t)
 
         # Step 1 : Sort multiindices and smolyak coefficients by the number of active dimensions, n
 
@@ -75,7 +75,7 @@ class MultivariateSmolyakBarycentricInterpolator:
         self.n_2_zetas = {}
 
         for nu in indxs_all:
-            zeta = indices.smolyak_coefficient_zeta_sparse(k, t, nu=nu)
+            zeta = indices.smolyak_coefficient_zeta(k, t, nu=nu)
             if zeta != 0:
                 indxs_zeta.append(nu)
                 n = len(nu)
