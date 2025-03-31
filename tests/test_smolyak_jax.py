@@ -7,12 +7,12 @@ from jax_smolyak.smolyak_jax import MultivariateSmolyakBarycentricInterpolator
 def test_smolyak_jax():
     print("\nTesting vector-valued Smolyak operator (jax) ...")
 
-    for node_gen in setup.generate_nodes(n=10, dmin=1, dmax=4):
+    for node_gen in setup.generate_nodes(n=20, dmin=1, dmax=4):
 
-        k = sorted(np.random.randint(low=1, high=10, size=node_gen.dim))
+        k = sorted(np.random.uniform(low=1, high=10, size=node_gen.dim))
         k /= k[0]
         d_out = np.random.randint(low=1, high=4)
-        t = np.random.randint(low=1, high=4)
+        t = np.random.uniform(low=1, high=8)
         print(f"... with k = {k}, t = {t}, d_out = {d_out},", node_gen)
 
         f = setup.generate_test_function_smolyak(node_gen=node_gen, k=k, t=t, d_out=d_out)
