@@ -96,7 +96,10 @@ class Leja(GeneratorMultiD):
             raise
 
     def __repr__(self) -> str:
-        return f"Leja (d = {self.dim}, domains = {self.domains.tolist()})"
+        if self.domains is not None:
+            return f"Leja (d = {self.dim}, domains = {self.domains.tolist()})"
+        else:
+            return f"Leja (d = {self.dim})"
 
     def scale_back(self, x: ArrayLike) -> ArrayLike:
         return self.scale(x, d1=self.domains, d2=self._reference_domains)
