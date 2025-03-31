@@ -185,9 +185,9 @@ class MultivariateSmolyakBarycentricInterpolator:
                 s_i = self.n_2_sorted_dims[n][i]
                 F_i = self.n_2_F[n][i]
 
-                dims = self.n_2_dims[n][i]
+                nu_inv_sorting = np.argsort(s_i)
                 for mu_degrees in it.product(*(range(nu[j] + 1) for j in s_i)):
-                    mu_tuple = tuple(zip(dims, mu_degrees))
+                    mu_tuple = tuple((s_i[i], mu_degrees[i]) for i in nu_inv_sorting if mu_degrees[i] > 0)
                     if mu_tuple not in f_evals_nu:
                         x[s_i] = [xi_k[i][deg] for xi_k, deg in zip(nodes, mu_degrees)]
                         f_evals_nu[mu_tuple] = f(x)
