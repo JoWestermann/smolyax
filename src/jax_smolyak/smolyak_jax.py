@@ -87,6 +87,7 @@ class MultivariateSmolyakBarycentricInterpolator:
         self.n_2_dims = {}
         self.n_2_sorted_dims = {}
         self.n_2_sorted_degs = {}
+        self.n_2_argsort_dims = {}
 
         for n in self.n_2_nus.keys():
             if n == 0:
@@ -95,11 +96,13 @@ class MultivariateSmolyakBarycentricInterpolator:
             self.n_2_dims[n] = np.empty((nn, n), dtype=int)
             self.n_2_sorted_dims[n] = np.empty((nn, n), dtype=int)
             self.n_2_sorted_degs[n] = np.empty((nn, n), dtype=int)
+            self.n_2_argsort_dims[n] = np.empty((nn, n), dtype=int)
 
             for i, nu in enumerate(self.n_2_nus[n]):
                 self.n_2_dims[n][i] = list(nu.keys())
                 sorted_nu = sorted(nu.items(), key=lambda x: x[1], reverse=True)
                 self.n_2_sorted_dims[n][i], self.n_2_sorted_degs[n][i] = zip(*sorted_nu)
+                self.n_2_argsort_dims[n][i] = np.argsort(self.n_2_sorted_dims[n][i])
 
         # Step 3 : Allocate and prefill data
 
@@ -183,11 +186,11 @@ class MultivariateSmolyakBarycentricInterpolator:
                     f_evals_nu = f_evals.get(nu_tuple, {})
 
                 s_i = self.n_2_sorted_dims[n][i]
+                argsort_s_i = self.n_2_argsort_dims[n][i]
                 F_i = self.n_2_F[n][i]
 
-                nu_inv_sorting = np.argsort(s_i)
                 for mu_degrees in it.product(*(range(nu[j] + 1) for j in s_i)):
-                    mu_tuple = tuple((s_i[i], mu_degrees[i]) for i in nu_inv_sorting if mu_degrees[i] > 0)
+                    mu_tuple = tuple((s_i[i], mu_degrees[i]) for i in argsort_s_i if mu_degrees[i] > 0)
                     if mu_tuple not in f_evals_nu:
                         x[s_i] = [xi_k[i][deg] for xi_k, deg in zip(nodes, mu_degrees)]
                         f_evals_nu[mu_tuple] = f(x)
