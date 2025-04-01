@@ -2,55 +2,24 @@ import numpy as np
 from numpy.typing import ArrayLike
 
 
-# deprecated
-def indexset_dense(k, t, idx=None):
-    if idx is None:
-        idx = ()
-    if len(k) == 0:
-        return [idx]
-    r = []
-    j = 0
-    while j * k[0] < t:
-        r += indexset_dense(k[1:], t - j * k[0], idx + (j,))
-        j += 1
-    return r
-
-
-# deprecated
-def unitball(nu, k, t, e=None):
-    if e is None:
-        e = []
-    if len(k) == 0:
-        return [e]
-    r = unitball(nu[1:], k[1:], t - nu[0] * k[0], e + [0])
-    if np.dot(nu, k) + k[0] < t:
-        r += unitball(nu[1:], k[1:], t - (nu[0] + 1) * k[0], e + [1])
-    return r
-
-
-# deprecated
-def smolyak_coefficient_zeta_dense(k, t, *, nu):
-    return np.sum([(-1) ** (np.sum(e)) for e in unitball(nu, k, t)])
-
-
-def indexset_sparse(k, t: float, i: int = 0, nu: dict[int, int] = None):
+def indexset(k, t: float, i: int = 0, nu: dict[int, int] = None):
     if nu is None:
         nu = {}
     if i >= len(k):
         return [nu]
     r = []
     if i + 1 < len(k) and k[i + 1] < t:
-        r += indexset_sparse(k, t, i + 1, nu)
+        r += indexset(k, t, i + 1, nu)
     else:
         r += [nu]
     j = 1
     while j * k[i] < t:
-        r += indexset_sparse(k, t - j * k[i], i + 1, {**nu, i: j})
+        r += indexset(k, t - j * k[i], i + 1, {**nu, i: j})
         j += 1
     return r
 
 
-def abs_e_sparse(k, t, i=0, e=None, *, nu: dict[int, int] = None):
+def abs_e(k, t, i=0, e=None, *, nu: dict[int, int] = None):
     if e is None:
         assert i == 0 and nu is not None
         e = 0
@@ -59,16 +28,16 @@ def abs_e_sparse(k, t, i=0, e=None, *, nu: dict[int, int] = None):
         return [e]
     r = []
     if i + 1 < len(k) and k[i + 1] < t:
-        r += abs_e_sparse(k, t, i + 1, e)
+        r += abs_e(k, t, i + 1, e)
     else:
         r += [e]
     if k[i] < t:
-        r += abs_e_sparse(k, t - k[i], i + 1, e + 1)
+        r += abs_e(k, t - k[i], i + 1, e + 1)
     return r
 
 
-def smolyak_coefficient_zeta_sparse(k, t: float, *, nu: dict[int, int] = None):
-    return np.sum([(-1) ** e for e in abs_e_sparse(k, t, nu=nu)])
+def smolyak_coefficient_zeta(k, t: float, *, nu: dict[int, int] = None):
+    return np.sum([(-1) ** e for e in abs_e(k, t, nu=nu)])
 
 
 def sparse_index_to_tuple(nu: dict[int, int], check: bool = False) -> tuple:
@@ -93,14 +62,14 @@ def dense_index_to_sparse(dense_nu: ArrayLike) -> dict[int, int]:
 
 
 def cardinality(k, t: float, nested: bool = False) -> int:
-    iset = indexset_sparse(k, t)
+    iset = indexset(k, t)
 
     if nested:
         return len(iset)
 
     n = 0
     for nu in iset:
-        c = np.sum([(-1) ** e for e in abs_e_sparse(k, t, nu=nu)])
+        c = np.sum([(-1) ** e for e in abs_e(k, t, nu=nu)])
         if c != 0:
             n += np.prod([v + 1 for v in nu.values()])
     return n

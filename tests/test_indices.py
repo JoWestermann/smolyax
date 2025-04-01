@@ -1,8 +1,9 @@
 import itertools as it
 
+import indices_dense_reference_impl as indices_dense
 import numpy as np
 
-from jax_smolyak import indices
+from jax_smolyak import indices as indices_sparse
 
 
 def get_random_indexsets(nested: bool = False):
@@ -13,10 +14,10 @@ def get_random_indexsets(nested: bool = False):
     k = np.log([a + b * i for i in range(d)]) / np.log(a)
 
     n_t = np.random.randint(low=1, high=100)
-    t = indices.find_suitable_t(k, n_t, nested=nested)
+    t = indices_sparse.find_suitable_t(k, n_t, nested=nested)
 
-    isparse = indices.indexset_sparse(k, t)
-    idense = indices.indexset_dense(k, t)
+    isparse = indices_sparse.indexset(k, t)
+    idense = indices_dense.indexset(k, t)
     print(
         f"\tConstructed {d}-dimensional multi-index sets with a={a}, b={b} and target n={n_t}. "
         + f"Sets are of cardinality {len(isparse)}."
@@ -35,7 +36,7 @@ def test_validity_of_indexsets():
                 f"Assertion failed with\n k = {k}, t = {t},\n idx = {idx_dense},\n idx*k = {np.dot(idx_dense, k)}, "
                 + f"\n (idx in i) = {idx_dense in idense},\n np.dot(idx, k) < t = {np.dot(idx_dense, k) < t}"
             )
-            idx_sparse = indices.dense_index_to_sparse(idx_dense)
+            idx_sparse = indices_sparse.dense_index_to_sparse(idx_dense)
             assert (idx_sparse in isparse) == (np.dot(idx_dense, k) < t), (
                 f"Assertion failed with\n k = {k}, t = {t},\n idx = {idx_dense},\n idx*k = {np.dot(idx_dense, k)}, "
                 + f"\n (idx in i) = {idx_sparse in isparse},\n np.dot(idx, k) < t = {np.dot(idx_dense, k) < t}"
@@ -49,11 +50,11 @@ def test_equality_of_sparse_and_dense_indexsets():
         k, _, isparse, idense = get_random_indexsets(nested=(i % 2) == 0)
 
         for nu in isparse:
-            nu_dense = indices.sparse_index_to_dense(nu, dim=len(k))
+            nu_dense = indices_sparse.sparse_index_to_dense(nu, dim=len(k))
             assert nu_dense in idense, nu_dense
 
         for nu in idense:
-            nu_sparse = indices.dense_index_to_sparse(nu)
+            nu_sparse = indices_sparse.dense_index_to_sparse(nu)
             assert nu_sparse in isparse, nu_sparse
 
 
@@ -64,6 +65,6 @@ def test_smolyak_coefficients():
         k, t, isparse, idense = get_random_indexsets(nested=(i % 2) == 0)
 
         for nu_1, nu_2 in zip(isparse, idense):
-            c_1 = indices.smolyak_coefficient_zeta_sparse(k, t, nu=nu_1)
-            c_2 = indices.smolyak_coefficient_zeta_dense(k, t, nu=nu_2)
+            c_1 = indices_sparse.smolyak_coefficient_zeta(k, t, nu=nu_1)
+            c_2 = indices_dense.smolyak_coefficient_zeta(k, t, nu=nu_2)
             assert c_1 == c_2
