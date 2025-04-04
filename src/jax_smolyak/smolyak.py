@@ -39,7 +39,7 @@ def _create_evaluate_tensorproduct_interpolant_for_vmap(n: int):
     return jax.jit(wrapped_function)
 
 
-class MultivariateSmolyakBarycentricInterpolator:
+class SmolyakBarycentricInterpolator:
 
     @property
     def is_nested(self) -> bool:
