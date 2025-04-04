@@ -189,7 +189,8 @@ class SmolyakBarycentricInterpolator:
                 argsort_s_i = self.n_2_argsort_dims[n][i]
                 F_i = self.n_2_F[n][i]
 
-                for mu_degrees in it.product(*(range(nu[j] + 1) for j in s_i)):
+                ranges = [range(nu[j] + 1) for j in s_i]
+                for mu_degrees in it.product(*ranges):
                     mu_tuple = tuple((s_i[i], mu_degrees[i]) for i in argsort_s_i if mu_degrees[i] > 0)
                     if mu_tuple not in f_evals_nu:
                         x[s_i] = [xi_k[i][deg] for xi_k, deg in zip(nodes, mu_degrees)]
