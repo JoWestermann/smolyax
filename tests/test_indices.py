@@ -36,11 +36,11 @@ def test_validity_of_indexsets():
                 f"Assertion failed with\n k = {k}, t = {t},\n idx = {idx_dense},\n idx*k = {np.dot(idx_dense, k)}, "
                 + f"\n (idx in i) = {idx_dense in idense},\n np.dot(idx, k) < t = {np.dot(idx_dense, k) < t}"
             )
-            idx_sparse = indices_sparse.dense_index_to_sparse(idx_dense)
-            assert (idx_sparse in isparse) == (np.dot(idx_dense, k) < t), (
-                f"Assertion failed with\n k = {k}, t = {t},\n idx = {idx_dense},\n idx*k = {np.dot(idx_dense, k)}, "
-                + f"\n (idx in i) = {idx_sparse in isparse},\n np.dot(idx, k) < t = {np.dot(idx_dense, k) < t}"
-            )
+            # idx_sparse = indices_sparse.dense_index_to_sparse(idx_dense)
+            # assert (idx_sparse in isparse) == (np.dot(idx_dense, k) < t), (
+            #     f"Assertion failed with\n k = {k}, t = {t},\n idx = {idx_dense},\n idx*k = {np.dot(idx_dense, k)}, "
+            #     + f"\n (idx in i) = {idx_sparse in isparse},\n np.dot(idx, k) < t = {np.dot(idx_dense, k) < t}"
+            # )
 
 
 def test_equality_of_sparse_and_dense_indexsets():

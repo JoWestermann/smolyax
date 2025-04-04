@@ -47,30 +47,29 @@ def indexset_tuples(k, t):
 
     return result
 
+
 def count_indexset_tuples(k, t):
     stack = [(0, t, ())]
     count = 0
-
+    len_k = len(k)
     while stack:
         dim_i, remaining_t, nu = stack.pop()
 
-        if dim_i >= len(k):
-            count +=1
+        if dim_i >= len_k:
+            count += 1
             continue
 
         # Case 1: Try skipping this dimension
-        if dim_i + 1 < len(k) and k[dim_i + 1] < remaining_t:
+        if dim_i + 1 < len_k and k[dim_i + 1] < remaining_t:
             stack.append((dim_i + 1, remaining_t, nu))
         else:
-            count+=1
+            count += 1
 
-        # Case 2: Try all j ≥ 1 while feasible
+        # Case 2: Try all j \ge 1 while feasible
         j = 1
         while j * k[dim_i] < remaining_t:
             # Create new sparse index
-            nu_extended = tuple(list(nu) + [(dim_i, j)])
-            new_t = remaining_t - j * k[dim_i]
-            stack.append((dim_i + 1, new_t, nu_extended))
+            stack.append((dim_i + 1, remaining_t - j * k[dim_i], nu + ((dim_i, j),)))
             j += 1
 
     return count
@@ -154,15 +153,16 @@ def dense_index_to_sparse(dense_nu: ArrayLike) -> dict[int, int]:
 
 def cardinality(k, t: float, nested: bool = False) -> int:
     if nested:
-        return count_indexset_tuples(k,t)
+        return count_indexset_tuples(k, t)
     else:
-        iset = indexset_tuples(k, t)
+        iset = indexset(k, t)  # indexset_tuples(k, t)
 
     n = 0
     for nu in iset:
-        c = np.sum([(-1) ** e for e in abs_e_tuple_nu(k, t, nu=nu)])
-        if c != 0:
-            n += np.prod([v + 1 for _, v in nu])
+        if smolyak_coefficient_zeta(k, t, nu=nu) != 0:
+            # c = np.sum([(-1) ** e for e in abs_e_tuple_nu(k, t, nu=nu)])
+            # if c != 0:
+            n += np.prod([v + 1 for v in nu.values()])
     return n
 
 
