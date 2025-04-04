@@ -1,6 +1,7 @@
 import numpy as np
 from numpy.typing import ArrayLike
 
+
 def indexset(k, t: float, dim_i: int = 0, nu: dict[int, int] = None):
     if nu is None:
         nu = {}
@@ -46,6 +47,7 @@ def indexset_tuples(k, t):
 
     return result
 
+
 def abs_e_tuple_nu(k, t, i=0, e=None, *, nu: tuple = None):
     if e is None:
         assert i == 0 and nu is not None
@@ -61,6 +63,7 @@ def abs_e_tuple_nu(k, t, i=0, e=None, *, nu: tuple = None):
     if k[i] < t:
         r += abs_e_tuple_nu(k, t - k[i], i + 1, e + 1)
     return r
+
 
 def abs_e(k, t, i=0, e=None, *, nu: dict[int, int] = None):
     if e is None:
