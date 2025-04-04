@@ -1,7 +1,6 @@
 import numpy as np
 from numpy.typing import ArrayLike
 
-
 def indexset(k, t: float, i: int = 0, nu: dict[int, int] = None):
     if nu is None:
         nu = {}
@@ -17,7 +16,6 @@ def indexset(k, t: float, i: int = 0, nu: dict[int, int] = None):
         r += indexset(k, t - j * k[i], i + 1, {**nu, i: j})
         j += 1
     return r
-
 
 def abs_e(k, t, i=0, e=None, *, nu: dict[int, int] = None):
     if e is None:
@@ -35,10 +33,25 @@ def abs_e(k, t, i=0, e=None, *, nu: dict[int, int] = None):
         r += abs_e(k, t - k[i], i + 1, e + 1)
     return r
 
-
-def smolyak_coefficient_zeta(k, t: float, *, nu: dict[int, int] = None):
-    return np.sum([(-1) ** e for e in abs_e(k, t, nu=nu)])
-
+def smolyak_coefficient_zeta(k, t, i=0, e=0, *, nu: dict[int, int] = None):
+    if nu is None:
+        nu = {}
+    if i == 0 and nu is not None:
+        t -= sum(nu[j] * k[j] for j in nu)
+    # Base case: if we've processed all dimensions, return the contribution (-1)**e.
+    if i >= len(k):
+        return 1 - 2 * (e & 1)
+    coeff = 0
+    # If the next k (if available) is less than t, we continue recursively;
+    # otherwise we add the current contribution.
+    if i + 1 < len(k) and k[i + 1] < t:
+        coeff += smolyak_coefficient_zeta(k, t, i + 1, e, nu=nu)
+    else:
+        coeff += (1 - 2 * (e & 1))
+    # If k[i] is less than t, subtract it from t and increase e (flipping the sign).
+    if k[i] < t:
+        coeff += smolyak_coefficient_zeta(k, t - k[i], i + 1, e + 1, nu=nu)
+    return coeff
 
 def sparse_index_to_tuple(nu: dict[int, int], check: bool = False) -> tuple:
     if check:
