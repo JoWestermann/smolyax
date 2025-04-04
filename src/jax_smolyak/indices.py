@@ -159,6 +159,7 @@ def cardinality(k, t: float, nested: bool = False) -> int:
 
     n = 0
     for nu in iset:
+        # we need a coefficient version of smolyak_coefficient_zeta
         if smolyak_coefficient_zeta(k, t, nu=nu) != 0:
             # c = np.sum([(-1) ** e for e in abs_e_tuple_nu(k, t, nu=nu)])
             # if c != 0:
