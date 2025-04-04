@@ -158,6 +158,7 @@ class SmolyakBarycentricInterpolator:
         """
         if f_evals is None:
             f_evals = {}
+            mu_degrees_f_evals = set()  # Whenever f_evals is instantiated, also instantiate this
 
         # Special case n = 0
         nu_tuple = indices.sparse_index_to_tuple({})
@@ -190,12 +191,14 @@ class SmolyakBarycentricInterpolator:
                 F_i = self.n_2_F[n][i]
 
                 for mu_degrees in it.product(*(range(nu[j] + 1) for j in s_i)):
-                    mu_tuple = tuple((s_i[i], mu_degrees[i]) for i in argsort_s_i if mu_degrees[i] > 0)
-                    if mu_tuple not in f_evals_nu:
-                        x[s_i] = [xi_k[i][deg] for xi_k, deg in zip(nodes, mu_degrees)]
-                        f_evals_nu[mu_tuple] = f(x)
-                        self.n_f_evals_new += 1
-                    F_i[:, *mu_degrees] = f_evals_nu[mu_tuple]
+                    if mu_degrees not in mu_degrees_f_evals:
+                        mu_tuple = tuple((s_i[i], mu_degrees[i]) for i in argsort_s_i if mu_degrees[i] > 0)
+                        if mu_tuple not in f_evals_nu:
+                            x[s_i] = [xi_k[i][deg] for xi_k, deg in zip(nodes, mu_degrees)]
+                            f_evals_nu[mu_tuple] = f(x)
+                            self.n_f_evals_new += 1
+                        F_i[:, *mu_degrees] = f_evals_nu[mu_tuple]
+                        mu_degrees_f_evals.add(mu_degrees)
 
                 if not self.is_nested:
                     f_evals[nu_tuple] = f_evals_nu
