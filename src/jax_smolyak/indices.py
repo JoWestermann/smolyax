@@ -47,6 +47,34 @@ def indexset_tuples(k, t):
 
     return result
 
+def count_indexset_tuples(k, t):
+    stack = [(0, t, ())]
+    count = 0
+
+    while stack:
+        dim_i, remaining_t, nu = stack.pop()
+
+        if dim_i >= len(k):
+            count +=1
+            continue
+
+        # Case 1: Try skipping this dimension
+        if dim_i + 1 < len(k) and k[dim_i + 1] < remaining_t:
+            stack.append((dim_i + 1, remaining_t, nu))
+        else:
+            count+=1
+
+        # Case 2: Try all j ≥ 1 while feasible
+        j = 1
+        while j * k[dim_i] < remaining_t:
+            # Create new sparse index
+            nu_extended = tuple(list(nu) + [(dim_i, j)])
+            new_t = remaining_t - j * k[dim_i]
+            stack.append((dim_i + 1, new_t, nu_extended))
+            j += 1
+
+    return count
+
 
 def abs_e_tuple_nu(k, t, i=0, e=None, *, nu: tuple = None):
     if e is None:
@@ -125,9 +153,10 @@ def dense_index_to_sparse(dense_nu: ArrayLike) -> dict[int, int]:
 
 
 def cardinality(k, t: float, nested: bool = False) -> int:
-    iset = indexset_tuples(k, t)
     if nested:
-        return len(iset)
+        return count_indexset_tuples(k,t)
+    else:
+        iset = indexset_tuples(k, t)
 
     n = 0
     for nu in iset:
