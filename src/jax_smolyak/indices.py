@@ -75,10 +75,13 @@ def cardinality(k, t: float, nested: bool = False) -> int:
     return n
 
 
-def find_suitable_t(k: ArrayLike, m: int = 50, nested: bool = False) -> int:
+def find_suitable_t(k: ArrayLike, m: int = 50, nested: bool = False, max_iter=32, accuracy=0.001) -> int:
     """
     k : weight vector of the anisotropy of the multi-index set
-    m : target cardinality of the multi-index set
+    m : target cardinality of the set of interpolation nodes
+    nested : flag to indicate whether nested or non-nested interpolation nodes are used
+    max_iter : maximal number of bisection iterations
+    accuracy : relative tolerance within which the cardinality of the set of interpolation nodes may deviate from m
     returns t : threshold parameter to construct a k-weighted multi-index set of size (roughly) m
     """
     assert m > 0
@@ -89,9 +92,9 @@ def find_suitable_t(k: ArrayLike, m: int = 50, nested: bool = False) -> int:
     # establish search interval
     l_interval = [1, 2]
     while cardinality(k, l_interval[0], nested) > m:
-        l_interval[0] /= 1.2
+        l_interval = [l_interval[0] / 1.2, l_interval[0]]
     while cardinality(k, l_interval[1], nested) < m:
-        l_interval[1] *= 1.2
+        l_interval = [l_interval[1], l_interval[1] * 1.2]
 
     # bisect search interval
     def midpoint(interval):
@@ -99,13 +102,15 @@ def find_suitable_t(k: ArrayLike, m: int = 50, nested: bool = False) -> int:
 
     t_cand = midpoint(l_interval)
     m_cand = cardinality(k, t_cand, nested)
-    for _ in range(32):
+    for _ in range(max_iter):
         if m_cand > m:
             l_interval = [l_interval[0], t_cand]
         else:
             l_interval = [t_cand, l_interval[1]]
         t_cand = midpoint(l_interval)
         m_cand = cardinality(k, t_cand, nested)
-        if m_cand == m:
+
+        if np.abs(m_cand - m) / m < accuracy:
             break
+
     return t_cand
