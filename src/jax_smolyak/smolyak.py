@@ -11,34 +11,6 @@ from . import barycentric, indices, nodes
 jax.config.update("jax_enable_x64", True)
 
 
-def __evaluate_tensorproduct_interpolant(
-    x: ArrayLike, F: ArrayLike, xi_list: List, w_list: List, s_list: List
-) -> ArrayLike:
-    norm = jnp.ones(x.shape[0])
-    for i, si in enumerate(s_list):
-        b = x[:, [si]] - xi_list[i]
-        has_zero = jnp.any(b == 0, axis=1)
-        zero_pattern = jnp.where(b == 0, 1.0, 0.0)
-        normal = w_list[i] / b
-        b = jnp.where(has_zero[:, None], zero_pattern, normal)
-        if i == 0:
-            F = jnp.einsum("ij,kj...->ik...", b, F)
-        else:
-            F = jnp.einsum("ij,ikj...->ik...", b, F)
-        norm *= jnp.sum(b, axis=1)
-    return F / norm[:, None]
-
-
-def _create_evaluate_tensorproduct_interpolant_for_vmap(n: int):
-    def wrapped_function(x, F, *args):
-        xi_list = args[:n]
-        w_list = args[n : 2 * n]
-        s_list = args[2 * n]
-        return __evaluate_tensorproduct_interpolant(x, F, xi_list, w_list, s_list)
-
-    return jax.jit(wrapped_function)
-
-
 class SmolyakBarycentricInterpolator:
 
     @property
@@ -213,6 +185,33 @@ class SmolyakBarycentricInterpolator:
         return f_evals
 
     def __compile_for_batchsize(self, batchsize: int) -> None:
+
+        def __evaluate_tensorproduct_interpolant(
+            x: ArrayLike, F: ArrayLike, xi_list: List, w_list: List, s_list: List
+        ) -> ArrayLike:
+            norm = jnp.ones(x.shape[0])
+            for i, si in enumerate(s_list):
+                b = x[:, [si]] - xi_list[i]
+                has_zero = jnp.any(b == 0, axis=1)
+                zero_pattern = jnp.where(b == 0, 1.0, 0.0)
+                normal = w_list[i] / b
+                b = jnp.where(has_zero[:, None], zero_pattern, normal)
+                if i == 0:
+                    F = jnp.einsum("ij,kj...->ik...", b, F)
+                else:
+                    F = jnp.einsum("ij,ikj...->ik...", b, F)
+                norm *= jnp.sum(b, axis=1)
+            return F / norm[:, None]
+
+        def _create_evaluate_tensorproduct_interpolant_for_vmap(n: int):
+            def wrapped_function(x, F, *args):
+                xi_list = args[:n]
+                w_list = args[n : 2 * n]
+                s_list = args[2 * n]
+                return __evaluate_tensorproduct_interpolant(x, F, xi_list, w_list, s_list)
+
+            return jax.jit(wrapped_function)
+
         for n in self.n_2_F.keys():
             self.__compiledfuncs[n] = jax.vmap(
                 _create_evaluate_tensorproduct_interpolant_for_vmap(n),
