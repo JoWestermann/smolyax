@@ -34,7 +34,7 @@ class SmolyakBarycentricInterpolator:
         f : interpolation target function
         d_out : dimension of the output of the target function f
         """
-        self.d = len(k)
+        self.d_in = len(k)
         self.d_out = d_out
         self._is_nested = node_gen.is_nested
 
@@ -189,6 +189,40 @@ class SmolyakBarycentricInterpolator:
         def __evaluate_tensorproduct_interpolant(
             x: ArrayLike, F: ArrayLike, xi_list: List, w_list: List, s_list: List
         ) -> ArrayLike:
+            """
+            Evaluate a tensor product interpolant.
+
+            Parameters
+            ----------
+            x : ArrayLike
+                Points at which to evaluate the tensor product interpolant of the target function `f`.
+                Should be a 2D array of shape `(n_points, d_in)` where `n_points` is the number of evaluation points
+                and `d_in` is the dimension of the input domain.
+
+            F : ArrayLike
+                Tensors storing the evaluations of the target function `f`.
+                Should be a multi-dimensional array with shape `(d_out, mu_1, mu_2, ..., mu_n)`
+                where each `mu_i` corresponds to the number of points in the ith dimension.
+
+            xi_list : List
+                Interpolation nodes. This should be a list of 1D arrays, where each array has a shape `(mu_i,)`
+                corresponding to the ith dimension.
+
+            w_list : List
+                Interpolation weights. This should be a list of 1D arrays, where each array has a shape `(mu_i,)`
+                corresponding to the ith dimension.
+
+            s_list : List
+                Dimensions with nonzero interpolation degree. This should be a list of 1D arrays, where each array has a
+                shape `(mu_i,)` corresponding to the ith dimension.
+
+            Returns
+            -------
+            ArrayLike
+                The evaluated tensor product interpolant at the points specified by `x`.
+                The shape of the output will be `(n_points, d_out)`.
+            """
+
             norm = jnp.ones(x.shape[0])
             for i, si in enumerate(s_list):
                 b = x[:, [si]] - xi_list[i]
@@ -204,6 +238,21 @@ class SmolyakBarycentricInterpolator:
             return F / norm[:, None]
 
         def _create_evaluate_tensorproduct_interpolant_for_vmap(n: int):
+            """
+            Create a JIT-compiled function for evaluating a tensor product interpolant, for use with `jax.vmap`.
+
+            Parameters
+            ----------
+            n : int
+                The number of dimensions in the tensor product interpolant. This determines how the input arguments are
+                split into `xi_list`, `w_list`, and `s_list`.
+
+            Returns
+            -------
+            Callable
+                A JIT-compiled function of __evaluate_tensorproduct_interpolant.
+            """
+
             def wrapped_function(x, F, *args):
                 xi_list = args[:n]
                 w_list = args[n : 2 * n]
@@ -217,13 +266,14 @@ class SmolyakBarycentricInterpolator:
                 _create_evaluate_tensorproduct_interpolant_for_vmap(n),
                 in_axes=(None, 0) + (0,) * (2 * n) + (0,),
             )
-        _ = self(np.random.random((batchsize, self.d)))
+
+        _ = self(np.random.random((batchsize, self.d_in)))
 
     def __call__(self, x: ArrayLike) -> ArrayLike:
         assert bool(self.__compiledfuncs) == bool(
             self.n_2_F
         ), "The operator has not yet been compiled for a target function."
-        if x.shape == (self.d,):
+        if x.shape == (self.d_in,):
             x = x[None, :]
         I_Lambda_x = np.broadcast_to(self.offset, (x.shape[0], self.d_out))
         for n in self.__compiledfuncs.keys():
