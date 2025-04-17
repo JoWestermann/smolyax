@@ -187,7 +187,7 @@ class SmolyakBarycentricInterpolator:
     def __compile_for_batchsize(self, batchsize: int) -> None:
 
         def __evaluate_tensorproduct_interpolant(
-            x: ArrayLike, F: ArrayLike, xi_list: List, w_list: List, s_list: List
+            x: ArrayLike, F: ArrayLike, xi_list: List, w_list: List, s_list: List, nu: List
         ) -> ArrayLike:
             """
             Evaluate a tensor product interpolant.
@@ -226,10 +226,10 @@ class SmolyakBarycentricInterpolator:
             norm = jnp.ones(x.shape[0])
             for i, si in enumerate(s_list):
                 b = x[:, [si]] - xi_list[i]
-                has_zero = jnp.any(b == 0, axis=1)
-                zero_pattern = jnp.where(b == 0, 1.0, 0.0)
-                normal = w_list[i] / b
-                b = jnp.where(has_zero[:, None], zero_pattern, normal)
+                mask_cols = jnp.arange(b.shape[1]) <= nu[i]
+                mask_zero = jnp.any((b == 0) & mask_cols, axis=1)
+                b = jnp.where(mask_zero[:, None], (b == 0).astype(b.dtype), jnp.divide(w_list[i], b))
+                b = jnp.where(mask_cols[None, :], b, 0)
                 if i == 0:
                     F = jnp.einsum("ij,kj...->ik...", b, F)
                 else:
@@ -257,14 +257,15 @@ class SmolyakBarycentricInterpolator:
                 xi_list = args[:n]
                 w_list = args[n : 2 * n]
                 s_list = args[2 * n]
-                return __evaluate_tensorproduct_interpolant(x, F, xi_list, w_list, s_list)
+                nu = args[2 * n + 1]
+                return __evaluate_tensorproduct_interpolant(x, F, xi_list, w_list, s_list, nu)
 
             return jax.jit(__evaluate_tensorproduct_interpolant_wrapped)
 
         for n in self.n_2_F.keys():
             self.__compiledfuncs[n] = jax.vmap(
                 __create_evaluate_tensorproduct_interpolant_for_vmap(n),
-                in_axes=(None, 0) + (0,) * (2 * n) + (0,),
+                in_axes=(None, 0) + (0,) * (2 * n) + (0, 0),
             )
 
         _ = self(np.random.random((batchsize, self.d_in)))
@@ -283,6 +284,7 @@ class SmolyakBarycentricInterpolator:
                 *self.n_2_nodes[n],
                 *self.n_2_weights[n],
                 self.n_2_sorted_dims[n],
+                self.n_2_sorted_degs[n],
             )
             I_Lambda_x += jnp.tensordot(self.n_2_zetas[n], res, axes=(0, 0))
         if isinstance(I_Lambda_x, np.ndarray):
