@@ -237,7 +237,7 @@ class SmolyakBarycentricInterpolator:
                 norm *= jnp.sum(b, axis=1)
             return F / norm[:, None]
 
-        def _create_evaluate_tensorproduct_interpolant_for_vmap(n: int):
+        def __create_evaluate_tensorproduct_interpolant_for_vmap(n: int):
             """
             Create a JIT-compiled function for evaluating a tensor product interpolant, for use with `jax.vmap`.
 
@@ -253,17 +253,17 @@ class SmolyakBarycentricInterpolator:
                 A JIT-compiled function of __evaluate_tensorproduct_interpolant.
             """
 
-            def wrapped_function(x, F, *args):
+            def __evaluate_tensorproduct_interpolant_wrapped(x, F, *args):
                 xi_list = args[:n]
                 w_list = args[n : 2 * n]
                 s_list = args[2 * n]
                 return __evaluate_tensorproduct_interpolant(x, F, xi_list, w_list, s_list)
 
-            return jax.jit(wrapped_function)
+            return jax.jit(__evaluate_tensorproduct_interpolant_wrapped)
 
         for n in self.n_2_F.keys():
             self.__compiledfuncs[n] = jax.vmap(
-                _create_evaluate_tensorproduct_interpolant_for_vmap(n),
+                __create_evaluate_tensorproduct_interpolant_for_vmap(n),
                 in_axes=(None, 0) + (0,) * (2 * n) + (0,),
             )
 
