@@ -11,34 +11,6 @@ from . import barycentric, indices, nodes
 jax.config.update("jax_enable_x64", True)
 
 
-def __evaluate_tensorproduct_interpolant(
-    x: ArrayLike, F: ArrayLike, xi_list: List, w_list: List, s_list: List
-) -> ArrayLike:
-    norm = jnp.ones(x.shape[0])
-    for i, si in enumerate(s_list):
-        b = x[:, [si]] - xi_list[i]
-        has_zero = jnp.any(b == 0, axis=1)
-        zero_pattern = jnp.where(b == 0, 1.0, 0.0)
-        normal = w_list[i] / b
-        b = jnp.where(has_zero[:, None], zero_pattern, normal)
-        if i == 0:
-            F = jnp.einsum("ij,kj...->ik...", b, F)
-        else:
-            F = jnp.einsum("ij,ikj...->ik...", b, F)
-        norm *= jnp.sum(b, axis=1)
-    return F / norm[:, None]
-
-
-def _create_evaluate_tensorproduct_interpolant_for_vmap(n: int):
-    def wrapped_function(x, F, *args):
-        xi_list = args[:n]
-        w_list = args[n : 2 * n]
-        s_list = args[2 * n]
-        return __evaluate_tensorproduct_interpolant(x, F, xi_list, w_list, s_list)
-
-    return jax.jit(wrapped_function)
-
-
 class SmolyakBarycentricInterpolator:
 
     @property
@@ -62,7 +34,7 @@ class SmolyakBarycentricInterpolator:
         f : interpolation target function
         d_out : dimension of the output of the target function f
         """
-        self.d = len(k)
+        self.d_in = len(k)
         self.d_out = d_out
         self._is_nested = node_gen.is_nested
 
@@ -213,18 +185,110 @@ class SmolyakBarycentricInterpolator:
         return f_evals
 
     def __compile_for_batchsize(self, batchsize: int) -> None:
+
+        def __compute_b_centered(x, xi, w, nu_i):
+            b = x - xi
+            mask_zero = jnp.any(b == 0, axis=1)
+            zero_pattern = jnp.where(b == 0, 1.0, 0.0)
+            normal = w / b
+            return jnp.where(mask_zero[:, None], zero_pattern, normal)
+
+        def __compute_b_noncentered(x, xi, w, nu_i):
+            b = x - xi
+            mask_cols = jnp.arange(b.shape[1]) <= nu_i
+            mask_zero = jnp.any((b == 0) & mask_cols, axis=1)
+            b = jnp.where(mask_zero[:, None], (b == 0).astype(b.dtype), jnp.divide(w, b))
+            return jnp.where(mask_cols[None, :], b, 0)
+
+        compute_b = __compute_b_centered
+        if not (self.zero == 0.0).all():
+            compute_b = __compute_b_noncentered
+
+        def __evaluate_tensorproduct_interpolant(
+            x: ArrayLike, F: ArrayLike, xi_list: List, w_list: List, s_list: List, nu: List
+        ) -> ArrayLike:
+            """
+            Evaluate a tensor product interpolant.
+
+            Parameters
+            ----------
+            x : ArrayLike
+                Points at which to evaluate the tensor product interpolant of the target function `f`.
+                Should be a 2D array of shape `(n_points, d_in)` where `n_points` is the number of evaluation points
+                and `d_in` is the dimension of the input domain.
+
+            F : ArrayLike
+                Tensors storing the evaluations of the target function `f`.
+                Should be a multi-dimensional array with shape `(d_out, mu_1, mu_2, ..., mu_n)`
+                where each `mu_i` corresponds to the number of points in the ith dimension.
+
+            xi_list : List
+                Interpolation nodes. This should be a list of 1D arrays, where each array has a shape `(mu_i,)`
+                corresponding to the ith dimension.
+
+            w_list : List
+                Interpolation weights. This should be a list of 1D arrays, where each array has a shape `(mu_i,)`
+                corresponding to the ith dimension.
+
+            s_list : List
+                Dimensions with nonzero interpolation degree. This should be a list of 1D arrays, where each array has a
+                shape `(mu_i,)` corresponding to the ith dimension.
+
+            Returns
+            -------
+            ArrayLike
+                The evaluated tensor product interpolant at the points specified by `x`.
+                The shape of the output will be `(n_points, d_out)`.
+            """
+
+            norm = jnp.ones(x.shape[0])
+            for i, si in enumerate(s_list):
+                b = compute_b(x[:, [si]], xi_list[i], w_list[i], nu[i])
+                if i == 0:
+                    F = jnp.einsum("ij,kj...->ik...", b, F)
+                else:
+                    F = jnp.einsum("ij,ikj...->ik...", b, F)
+                norm *= jnp.sum(b, axis=1)
+            return F / norm[:, None]
+
+        def __create_evaluate_tensorproduct_interpolant_for_vmap(n: int):
+            """
+            Create a JIT-compiled function for evaluating a tensor product interpolant, for use with `jax.vmap`.
+
+            Parameters
+            ----------
+            n : int
+                The number of dimensions in the tensor product interpolant. This determines how the input arguments are
+                split into `xi_list`, `w_list`, and `s_list`.
+
+            Returns
+            -------
+            Callable
+                A JIT-compiled function of __evaluate_tensorproduct_interpolant.
+            """
+
+            def __evaluate_tensorproduct_interpolant_wrapped(x, F, *args):
+                xi_list = args[:n]
+                w_list = args[n : 2 * n]
+                s_list = args[2 * n]
+                nu = args[2 * n + 1]
+                return __evaluate_tensorproduct_interpolant(x, F, xi_list, w_list, s_list, nu)
+
+            return jax.jit(__evaluate_tensorproduct_interpolant_wrapped)
+
         for n in self.n_2_F.keys():
             self.__compiledfuncs[n] = jax.vmap(
-                _create_evaluate_tensorproduct_interpolant_for_vmap(n),
-                in_axes=(None, 0) + (0,) * (2 * n) + (0,),
+                __create_evaluate_tensorproduct_interpolant_for_vmap(n),
+                in_axes=(None, 0) + (0,) * (2 * n) + (0, 0),
             )
-        _ = self(np.random.random((batchsize, self.d)))
+
+        _ = self(np.random.random((batchsize, self.d_in)))
 
     def __call__(self, x: ArrayLike) -> ArrayLike:
         assert bool(self.__compiledfuncs) == bool(
             self.n_2_F
         ), "The operator has not yet been compiled for a target function."
-        if x.shape == (self.d,):
+        if x.shape == (self.d_in,):
             x = x[None, :]
         I_Lambda_x = np.broadcast_to(self.offset, (x.shape[0], self.d_out))
         for n in self.__compiledfuncs.keys():
@@ -234,6 +298,7 @@ class SmolyakBarycentricInterpolator:
                 *self.n_2_nodes[n],
                 *self.n_2_weights[n],
                 self.n_2_sorted_dims[n],
+                self.n_2_sorted_degs[n],
             )
             I_Lambda_x += jnp.tensordot(self.n_2_zetas[n], res, axes=(0, 0))
         if isinstance(I_Lambda_x, np.ndarray):
