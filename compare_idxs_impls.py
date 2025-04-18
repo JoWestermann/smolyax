@@ -78,6 +78,13 @@ def indexset_tuples(k, t):
     return result
 
 
+def compare_index_sets(dict_set, tuple_set):
+    def dict_to_tuple(nu_dict):
+        return tuple(sorted((i, v) for i, v in nu_dict.items()))
+
+    dict_as_tuples = set(dict_to_tuple(nu) for nu in dict_set)
+
+    return dict_as_tuples == tuple_set
 
 if __name__ == "__main__":
     import time
@@ -109,7 +116,7 @@ if __name__ == "__main__":
         total_tuple += [t_tuple]
 
 
-        if not c_original == c_tuple :
+        if not compare_index_sets(indexset_original(k, t), indexset_tuples(k, t)):
             print('Unequal sets!')
             print('k = ', k)
             print('t = ', t)
