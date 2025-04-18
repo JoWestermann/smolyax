@@ -122,11 +122,22 @@ class SmolyakBarycentricInterpolator:
 
     def set_f(self, *, f: Callable, f_evals: dict = None, batchsize: int = 250) -> dict:
         """
-        Compute (or reuse pre-computed) evaluations of the target function f at the interpolation nodes.
-        f : interpolation target function
-        f_evals : dictionary mapping interpolation nodes to function evaluations
-        batchsize : batchsize of interpolator input, used for pre-compiling __call__
-        returns : updated dictionary f_evals containing newly computed interpolation node to evaluation mappings
+        Compute (or reuse pre-computed) evaluations of the target function `f` at the interpolation nodes of the Smolyak operator.
+
+        Parameters
+        ----------
+        f : Callable
+            The interpolation target function.
+        f_evals : dict, optional
+            A dictionary mapping interpolation nodes to function evaluations.
+            If provided, these evaluations will be reused.
+        batchsize : int, default=250
+            The anticipated batch size of the interpolator input, used for pre-compiling the `__call__` method.
+
+        Returns
+        -------
+        dict
+            An updated dictionary containing all computed evaluations of the target function `f`.
         """
         if f_evals is None:
             f_evals = {}
@@ -285,6 +296,21 @@ class SmolyakBarycentricInterpolator:
         _ = self(np.random.random((batchsize, self.d_in)))
 
     def __call__(self, x: ArrayLike) -> jax.Array:
+        """
+        Evaluate the Smolyak operator at points `x`.
+
+        Parameters
+        ----------
+        x : ArrayLike
+            Points at which to evaluate the tensor product interpolant of the target function `f`.
+            Should be a 2D array of shape `(n_points, d_in)` where `n_points` is the number of evaluation points
+            and `d_in` is the dimension of the input domain.
+
+        Returns
+        -------
+        ArrayLike
+            The interpolant of the target function `f` evaluated at points `x`.
+        """
         assert bool(self.__compiledfuncs) == bool(
             self.n_2_F
         ), "The operator has not yet been compiled for a target function."
