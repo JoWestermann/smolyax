@@ -4,7 +4,7 @@ from typing import Callable, List
 import jax
 import jax.numpy as jnp
 import numpy as np
-from numpy.typing import ArrayLike
+from jax.typing import ArrayLike
 
 from . import barycentric, indices, nodes
 
@@ -206,7 +206,7 @@ class SmolyakBarycentricInterpolator:
 
         def __evaluate_tensorproduct_interpolant(
             x: ArrayLike, F: ArrayLike, xi_list: List, w_list: List, s_list: List, nu: List
-        ) -> ArrayLike:
+        ) -> jax.Array:
             """
             Evaluate a tensor product interpolant.
 
@@ -284,7 +284,7 @@ class SmolyakBarycentricInterpolator:
 
         _ = self(np.random.random((batchsize, self.d_in)))
 
-    def __call__(self, x: ArrayLike) -> ArrayLike:
+    def __call__(self, x: ArrayLike) -> jax.Array:
         assert bool(self.__compiledfuncs) == bool(
             self.n_2_F
         ), "The operator has not yet been compiled for a target function."
