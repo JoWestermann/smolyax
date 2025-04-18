@@ -288,9 +288,10 @@ class SmolyakBarycentricInterpolator:
         assert bool(self.__compiledfuncs) == bool(
             self.n_2_F
         ), "The operator has not yet been compiled for a target function."
+        x = jnp.asarray(x)
         if x.shape == (self.d_in,):
             x = x[None, :]
-        I_Lambda_x = np.broadcast_to(self.offset, (x.shape[0], self.d_out))
+        I_Lambda_x = jnp.broadcast_to(self.offset, (x.shape[0], self.d_out))
         for n in self.__compiledfuncs.keys():
             res = self.__compiledfuncs[n](
                 x,
@@ -301,6 +302,4 @@ class SmolyakBarycentricInterpolator:
                 self.n_2_sorted_degs[n],
             )
             I_Lambda_x += jnp.tensordot(self.n_2_zetas[n], res, axes=(0, 0))
-        if isinstance(I_Lambda_x, np.ndarray):
-            return I_Lambda_x
         return I_Lambda_x.block_until_ready()
