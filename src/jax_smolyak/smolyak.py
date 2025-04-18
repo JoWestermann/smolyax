@@ -124,7 +124,8 @@ class SmolyakBarycentricInterpolator:
 
     def set_f(self, *, f: Callable, f_evals: dict = None, batchsize: int = 250) -> dict:
         """
-        Compute (or reuse pre-computed) evaluations of the target function `f` at the interpolation nodes of the Smolyak operator.
+        Compute (or reuse pre-computed) evaluations of the target function `f` at the interpolation nodes of the
+        Smolyak operator.
 
         Parameters
         ----------
