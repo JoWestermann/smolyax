@@ -1,5 +1,5 @@
 import itertools as it
-from typing import Callable, List
+from typing import Callable, Sequence
 
 import jax
 import jax.numpy as jnp
@@ -219,45 +219,49 @@ class SmolyakBarycentricInterpolator:
             compute_b = __compute_b_noncentered
 
         def __evaluate_tensorproduct_interpolant(
-            x: ArrayLike, F: ArrayLike, xi_list: List, w_list: List, s_list: List, nu: List
+            x: jax.Array,
+            F: jax.Array,
+            xi_list: Sequence[jax.Array],
+            w_list: Sequence[jax.Array],
+            sorted_dims: Sequence[int],
+            sorted_degs: Sequence[int],
         ) -> jax.Array:
             """
             Evaluate a tensor product interpolant.
 
             Parameters
             ----------
-            x : ArrayLike
+            x : jax.Array
                 Points at which to evaluate the tensor product interpolant of the target function `f`.
                 Should be a 2D array of shape `(n_points, d_in)` where `n_points` is the number of evaluation points
                 and `d_in` is the dimension of the input domain.
 
-            F : ArrayLike
+            F : jax.Array
                 Tensors storing the evaluations of the target function `f`.
                 Should be a multi-dimensional array with shape `(d_out, mu_1, mu_2, ..., mu_n)`
                 where each `mu_i` corresponds to the number of points in the ith dimension.
 
-            xi_list : List
-                Interpolation nodes. This should be a list of 1D arrays, where each array has a shape `(mu_i,)`
-                corresponding to the ith dimension.
+            xi_list : Sequence[jax.Array]
+                Interpolation nodes. A sequence of 1D arrays, each with shape `(mu_i,)` for the ith dimension.
 
-            w_list : List
-                Interpolation weights. This should be a list of 1D arrays, where each array has a shape `(mu_i,)`
-                corresponding to the ith dimension.
+            w_list : Sequence[jax.Array]
+                Interpolation weights. A sequence of 1D arrays, each with shape `(mu_i,)` for the ith dimension.
 
-            s_list : List
-                Dimensions with nonzero interpolation degree. This should be a list of 1D arrays, where each array has a
-                shape `(mu_i,)` corresponding to the ith dimension.
+            sorted_dims : Sequence[int]
+                Dimensions with nonzero interpolation degree.
+
+            sorted_degs : Sequence[int]
+                Interpolation degrees per dimension.
 
             Returns
             -------
-            ArrayLike
+            jax.Array
                 The evaluated tensor product interpolant at the points specified by `x`.
                 The shape of the output will be `(n_points, d_out)`.
             """
-
             norm = jnp.ones(x.shape[0])
-            for i, si in enumerate(s_list):
-                b = compute_b(x[:, [si]], xi_list[i], w_list[i], nu[i])
+            for i, (si, nui) in enumerate(zip(sorted_dims, sorted_degs)):
+                b = compute_b(x[:, [si]], xi_list[i], w_list[i], nui)
                 if i == 0:
                     F = jnp.einsum("ij,kj...->ik...", b, F)
                 else:
