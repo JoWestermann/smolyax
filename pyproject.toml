@@ -37,3 +37,6 @@ extend-ignore = """E203"""
 python_version = "3.11"
 inputs = ["src/jax_smolyak"]
 disable = ["import-error"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
