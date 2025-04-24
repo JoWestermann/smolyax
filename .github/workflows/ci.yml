@@ -12,7 +12,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install dependencies
-        run: pip install .[dev]; pip install -e .
+        run: pip install .[dev]
       - name: Run Tests
         run: pytest tests/
       # - name: Run Type Checking (pytype)
