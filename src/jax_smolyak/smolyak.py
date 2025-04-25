@@ -26,15 +26,26 @@ class SmolyakBarycentricInterpolator:
         k: ArrayLike,
         t: float,
         d_out: int,
-        f: Callable = None,
+        f: Callable[[ArrayLike], jax.Array] = None,
         batchsize: int = 250,
     ) -> None:
         """
-        node_gen : interpolation node generator object
-        k : weight vector of the anisotropy of the multi-index set (TODO: move construction of multi-index outside)
-        t : threshold controlling the size of the multi-index set
-        f : interpolation target function
-        d_out : dimension of the output of the target function f
+        Initialize the Smolyak Barycentric Interpolator.
+
+        Parameters
+        ----------
+        node_gen : nodes.Generator
+            Generator object that returns interpolation nodes for each dimension.
+        k : ArrayLike
+            Anisotropy weight vector of the multi-index set. Shape `(d_in,)`.
+        t : float
+            Threshold that controls the size of the multi-index set.
+        d_out : int
+            Output dimension of the target function.
+        f : Callable[[ArrayLike], jax.Array], optional
+            Target function to interpolate.
+        batchsize : int, default=250
+            Anticipated batch size of the interpolator input, used for pre-compiling the `__call__` method.
         """
         self.d_in = len(k)
         self.d_out = d_out
@@ -122,20 +133,26 @@ class SmolyakBarycentricInterpolator:
         if f is not None:
             self.set_f(f=f, batchsize=batchsize)
 
-    def set_f(self, *, f: Callable, f_evals: dict = None, batchsize: int = 250) -> dict:
+    def set_f(
+        self,
+        *,
+        f: Callable[[ArrayLike], jax.Array],
+        f_evals: dict[tuple, dict[tuple, jax.Array]] = None,
+        batchsize: int = 250,
+    ) -> dict[tuple, dict[tuple, jax.Array]]:
         """
         Compute (or reuse pre-computed) evaluations of the target function `f` at the interpolation nodes of the
         Smolyak operator.
 
         Parameters
         ----------
-        f : Callable
-            The interpolation target function.
+        f : Callable[[ArrayLike], jax.Array]
+            Target function to interpolate.
         f_evals : dict, optional
             A dictionary mapping interpolation nodes to function evaluations.
             If provided, these evaluations will be reused.
         batchsize : int, default=250
-            The anticipated batch size of the interpolator input, used for pre-compiling the `__call__` method.
+            Anticipated batch size of the interpolator input, used for pre-compiling the `__call__` method.
 
         Returns
         -------
@@ -308,14 +325,14 @@ class SmolyakBarycentricInterpolator:
         Parameters
         ----------
         x : ArrayLike
-            Points at which to evaluate the tensor product interpolant of the target function `f`.
-            Should be a 2D array of shape `(n_points, d_in)` where `n_points` is the number of evaluation points
+            Points at which to evaluate the Smolyak interpolant of the target function `f`.
+            Shape: `(n_points, d_in)` or `(d_in,)`, where `n_points` is the number of evaluation points
             and `d_in` is the dimension of the input domain.
 
         Returns
         -------
         ArrayLike
-            The interpolant of the target function `f` evaluated at points `x`.
+            The interpolant of the target function `f` evaluated at points `x`. Shape: `(n_points, d_out)`
         """
         assert bool(self.__compiledfuncs) == bool(
             self.n_2_F
