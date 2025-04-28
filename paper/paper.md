@@ -7,9 +7,10 @@ tags:
   - HPC
   - Smolyak
   - Sparse Grids
+  - Polynomial Chaos
 authors:
   - name: Josephine Westermann
-    orcid: 0000-0000-0000-0000
+    orcid: 0000-0003-3450-9166
     affiliation: 1
     corresponding: true
   - name: Joshua Chen
@@ -45,11 +46,22 @@ header-includes:
 
 # Summary
 
-**[TODO]**
+The `jax-smolyak` library provides interpolation capabilities for arbitrary multivariate and vector-valued functions $f : \mathbb{R}^{d_1} \to \mathbb{R}^{d_2}$ for any $d_1, d_2 \in \mathbb{N}$.
 
-# Statement of need
+It is based on JAX, a free and open-source Python library for high-performance computing, and integrates seamlessly with the Python ecosystem. Thanks to JAX's device management, `jax-smolyak` runs natively on both CPU and GPU. While implementing Smolyak interpolation in JAX is challenging due to the highly irregular data structures involved, `jax-smolyak` overcomes this by employing a tailored batching and padding strategy (described below), enabling efficient vectorization, scalability, and parallel execution.
 
-**[TODO]**
+`jax-smolyak` supports interpolation on sparse grids based on either Leja or Gauss-Hermite interpolation nodes and characterized by anisotropic multi-index sets of the form
+$$
+\Lambda_{\mathbf{k}, \ell} := \{\boldsymbol{\nu} \in \mathbb{N}_0^{d_1} : \sum_{j=1}^{d_1} k_j \nu_j < \ell\},
+$$
+where $\mathbf{k} \in \mathbb{R}^{d_1}$. In the special case $\mathbf{k} = (1)_{j=1}^{d_1}$, this reduces to the classical total-degree multi-index set. Additional types of interpolation nodes or multi-index sets can be incorporated easily by implementing a minimalistic interface.
+
+# Statement of Need
+
+Polynomial approximation is a well-studied and powerful tool in applied mathematics, with important applications, for example, in surrogate modeling and uncertainty quantification. 
+Due to their deterministic construction and the availability of error bounds for a wide range of function classes, polynomial surrogates can serve as both a reliable and cost-effective alternative to neural networks — for example, in constructing operator surrogates [@westermann:2025].
+
+While several libraries provide high-dimensional interpolation functionality, none, to our knowledge, provides a hardware-agnostic, high performance implementation. `jax-smolyak` addresses this gap by providing an efficient solution within the popular JAX ecosystem.
 
 # High-dimensional interpolation with the Smolyak operator
 
@@ -170,17 +182,7 @@ We now have everything in place to construct the Smolyak interpolant in a form t
   \end{algorithmic}
 \end{algorithm}
 
-# Software capabilities of \textsc{jax-smolyak}
-
-The library provides interpolation capabilities for arbitrary multivariate and vector-valued functions $f : \mathbb{R}^{d_1} \to \mathbb{R}^{d_2}$ for any $d_1, d_2 \in \mathbb{N}$. While the previous discussion focused on scalar-valued interpolation targets (i.e., the case $d_2 = 1$), the extension to vector-valued functions is straightforward and works seamlessly, provided that all interpolants in the codomain are constructed using the same multi-index set $\Lambda$.
-
-The quality of the interpolation depends on the smoothness of $f$ and the choice of interpolation nodes $\xi$ and multi-index sets $\Lambda$. Suitable choices have been extensively studied in the literature (see, e.g., **[TODO:  references]**).
-
-This repository includes generators for Leja and Gauss-Hermite interpolation nodes, as well as multi-index sets of the form
-$$\Lambda_{\bsk, t} := \{\bsnu \in \mathbb{N}_0^{d_1} \ : \  \sum_{j=1}^{d_1} k_j \nu_j < t\}.$$
-where $\bsk \in \mathbb{R}^{d_1}$ satisfies $k_j \le k_{j+1}$ for all $j=1, \dots, d_1 - 1$. In the special case $\bsk = (1)_{j=1}^{d_1}$, this reduces to the classical total-degree multi-index set.
-
-Additional interpolation nodes or multi-index sets can be incorporated with minimal effort by implementing a minimalistic interface.
+While the previous discussion focused on scalar-valued interpolation targets (i.e., the case $d_2 = 1$), the extension to vector-valued functions is straightforward and works seamlessly, provided that all interpolants in the codomain are constructed using the same multi-index set $\Lambda$.
 
 # Acknowledgements
 
