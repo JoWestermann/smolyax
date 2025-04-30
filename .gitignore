@@ -9,3 +9,4 @@ paper/jats
 *.pyd
 *.egg-info
 build/*git st
+.benchmarks
