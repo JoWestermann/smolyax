@@ -1,12 +1,24 @@
-import numpy as np
-from numpy.typing import ArrayLike
+import jax
+import jax.numpy as jnp
+from jax.typing import ArrayLike
 
 
-def compute_weights(nodes: ArrayLike) -> ArrayLike:
+@jax.jit
+def compute_weights(nodes: ArrayLike) -> jax.Array:
     """
-    nodes: np.array of shape (n, ) containing n one-dimensional interpolation nodes
-    returns: corresponding barycentric interpolation weights
+    Compute the barycentric interpolation weights corresponding to given nodes.
+
+    Parameters
+    ----------
+    nodes : ArrayLike
+        A 1D array of shape (n,) containing n one-dimensional interpolation nodes.
+
+    Returns
+    -------
+    ArrayLike
+        The corresponding barycentric interpolation weights.
     """
+    nodes = jnp.asarray(nodes)
     diffs = nodes[:, None] - nodes
-    np.fill_diagonal(diffs, 1)
-    return np.prod(1 / diffs, axis=0)
+    diffs = jnp.where(diffs == 0, 1, diffs)
+    return jnp.prod(1 / diffs, axis=0)

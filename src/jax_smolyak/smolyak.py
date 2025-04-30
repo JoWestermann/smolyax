@@ -1,14 +1,16 @@
 import itertools as it
-from typing import Callable, List
+from typing import Callable, Sequence
 
 import jax
 import jax.numpy as jnp
 import numpy as np
-from numpy.typing import ArrayLike
+from jax.typing import ArrayLike
 
 from . import barycentric, indices, nodes
 
 jax.config.update("jax_enable_x64", True)
+
+rng_key = jax.random.PRNGKey(0)
 
 
 class SmolyakBarycentricInterpolator:
@@ -24,15 +26,26 @@ class SmolyakBarycentricInterpolator:
         k: ArrayLike,
         t: float,
         d_out: int,
-        f: Callable = None,
+        f: Callable[[ArrayLike], jax.Array] = None,
         batchsize: int = 250,
     ) -> None:
         """
-        node_gen : interpolation node generator object
-        k : weight vector of the anisotropy of the multi-index set (TODO: move construction of multi-index outside)
-        t : threshold controlling the size of the multi-index set
-        f : interpolation target function
-        d_out : dimension of the output of the target function f
+        Initialize the Smolyak Barycentric Interpolator.
+
+        Parameters
+        ----------
+        node_gen : nodes.Generator
+            Generator object that returns interpolation nodes for each dimension.
+        k : ArrayLike
+            Anisotropy weight vector of the multi-index set. Shape `(d_in,)`.
+        t : float
+            Threshold that controls the size of the multi-index set.
+        d_out : int
+            Output dimension of the target function.
+        f : Callable[[ArrayLike], jax.Array], optional
+            Target function to interpolate.
+        batchsize : int, default=250
+            Anticipated batch size of the interpolator input, used for pre-compiling the `__call__` method.
         """
         self.d_in = len(k)
         self.d_out = d_out
@@ -120,13 +133,31 @@ class SmolyakBarycentricInterpolator:
         if f is not None:
             self.set_f(f=f, batchsize=batchsize)
 
-    def set_f(self, *, f: Callable, f_evals: dict = None, batchsize: int = 250) -> dict:
+    def set_f(
+        self,
+        *,
+        f: Callable[[ArrayLike], jax.Array],
+        f_evals: dict[tuple, dict[tuple, jax.Array]] = None,
+        batchsize: int = 250,
+    ) -> dict[tuple, dict[tuple, jax.Array]]:
         """
-        Compute (or reuse pre-computed) evaluations of the target function f at the interpolation nodes.
-        f : interpolation target function
-        f_evals : dictionary mapping interpolation nodes to function evaluations
-        batchsize : batchsize of interpolator input, used for pre-compiling __call__
-        returns : updated dictionary f_evals containing newly computed interpolation node to evaluation mappings
+        Compute (or reuse pre-computed) evaluations of the target function `f` at the interpolation nodes of the
+        Smolyak operator.
+
+        Parameters
+        ----------
+        f : Callable[[ArrayLike], jax.Array]
+            Target function to interpolate.
+        f_evals : dict, optional
+            A dictionary mapping interpolation nodes to function evaluations.
+            If provided, these evaluations will be reused.
+        batchsize : int, default=250
+            Anticipated batch size of the interpolator input, used for pre-compiling the `__call__` method.
+
+        Returns
+        -------
+        dict
+            An updated dictionary containing all computed evaluations of the target function `f`.
         """
         if f_evals is None:
             f_evals = {}
@@ -205,45 +236,49 @@ class SmolyakBarycentricInterpolator:
             compute_b = __compute_b_noncentered
 
         def __evaluate_tensorproduct_interpolant(
-            x: ArrayLike, F: ArrayLike, xi_list: List, w_list: List, s_list: List, nu: List
-        ) -> ArrayLike:
+            x: jax.Array,
+            F: jax.Array,
+            xi_list: Sequence[jax.Array],
+            w_list: Sequence[jax.Array],
+            sorted_dims: Sequence[int],
+            sorted_degs: Sequence[int],
+        ) -> jax.Array:
             """
             Evaluate a tensor product interpolant.
 
             Parameters
             ----------
-            x : ArrayLike
+            x : jax.Array
                 Points at which to evaluate the tensor product interpolant of the target function `f`.
                 Should be a 2D array of shape `(n_points, d_in)` where `n_points` is the number of evaluation points
                 and `d_in` is the dimension of the input domain.
 
-            F : ArrayLike
+            F : jax.Array
                 Tensors storing the evaluations of the target function `f`.
                 Should be a multi-dimensional array with shape `(d_out, mu_1, mu_2, ..., mu_n)`
                 where each `mu_i` corresponds to the number of points in the ith dimension.
 
-            xi_list : List
-                Interpolation nodes. This should be a list of 1D arrays, where each array has a shape `(mu_i,)`
-                corresponding to the ith dimension.
+            xi_list : Sequence[jax.Array]
+                Interpolation nodes. A sequence of 1D arrays, each with shape `(mu_i,)` for the ith dimension.
 
-            w_list : List
-                Interpolation weights. This should be a list of 1D arrays, where each array has a shape `(mu_i,)`
-                corresponding to the ith dimension.
+            w_list : Sequence[jax.Array]
+                Interpolation weights. A sequence of 1D arrays, each with shape `(mu_i,)` for the ith dimension.
 
-            s_list : List
-                Dimensions with nonzero interpolation degree. This should be a list of 1D arrays, where each array has a
-                shape `(mu_i,)` corresponding to the ith dimension.
+            sorted_dims : Sequence[int]
+                Dimensions with nonzero interpolation degree.
+
+            sorted_degs : Sequence[int]
+                Interpolation degrees per dimension.
 
             Returns
             -------
-            ArrayLike
+            jax.Array
                 The evaluated tensor product interpolant at the points specified by `x`.
                 The shape of the output will be `(n_points, d_out)`.
             """
-
             norm = jnp.ones(x.shape[0])
-            for i, si in enumerate(s_list):
-                b = compute_b(x[:, [si]], xi_list[i], w_list[i], nu[i])
+            for i, (si, nui) in enumerate(zip(sorted_dims, sorted_degs)):
+                b = compute_b(x[:, [si]], xi_list[i], w_list[i], nui)
                 if i == 0:
                     F = jnp.einsum("ij,kj...->ik...", b, F)
                 else:
@@ -281,16 +316,31 @@ class SmolyakBarycentricInterpolator:
                 __create_evaluate_tensorproduct_interpolant_for_vmap(n),
                 in_axes=(None, 0) + (0,) * (2 * n) + (0, 0),
             )
+        _ = self(jax.random.uniform(rng_key, (batchsize, self.d_in)))
 
-        _ = self(np.random.random((batchsize, self.d_in)))
+    def __call__(self, x: ArrayLike) -> jax.Array:
+        """
+        Evaluate the Smolyak operator at points `x`.
 
-    def __call__(self, x: ArrayLike) -> ArrayLike:
+        Parameters
+        ----------
+        x : ArrayLike
+            Points at which to evaluate the Smolyak interpolant of the target function `f`.
+            Shape: `(n_points, d_in)` or `(d_in,)`, where `n_points` is the number of evaluation points
+            and `d_in` is the dimension of the input domain.
+
+        Returns
+        -------
+        ArrayLike
+            The interpolant of the target function `f` evaluated at points `x`. Shape: `(n_points, d_out)`
+        """
         assert bool(self.__compiledfuncs) == bool(
             self.n_2_F
         ), "The operator has not yet been compiled for a target function."
+        x = jnp.asarray(x)
         if x.shape == (self.d_in,):
             x = x[None, :]
-        I_Lambda_x = np.broadcast_to(self.offset, (x.shape[0], self.d_out))
+        I_Lambda_x = jnp.broadcast_to(self.offset, (x.shape[0], self.d_out))
         for n in self.__compiledfuncs.keys():
             res = self.__compiledfuncs[n](
                 x,
@@ -301,6 +351,4 @@ class SmolyakBarycentricInterpolator:
                 self.n_2_sorted_degs[n],
             )
             I_Lambda_x += jnp.tensordot(self.n_2_zetas[n], res, axes=(0, 0))
-        if isinstance(I_Lambda_x, np.ndarray):
-            return I_Lambda_x
         return I_Lambda_x.block_until_ready()
