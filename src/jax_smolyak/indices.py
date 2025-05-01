@@ -1,7 +1,7 @@
-from typing import Tuple
+from typing import List, Tuple
 
 import numpy as np
-from numba import njit
+from numba import jit, njit
 from numpy.typing import ArrayLike
 
 
@@ -79,6 +79,70 @@ def abs_e(k, t, i=0, e=None, *, nu: dict[int, int] = None):
     return r
 
 
+@njit(cache=True)
+def _abs_e_subtree_stack(k, d, rem_t, parity):
+    """
+    Suffix sum of (-1)^e exactly matching abs_e_list:
+    always recurse from i=0 over all dimensions.
+    """
+    total = 0
+    stack = [(0, rem_t, parity)]
+    while stack:
+        i, rt, p = stack.pop()
+        if i >= d:
+            total += 1 - (p << 1)
+            continue
+        # skip‐case
+        if i + 1 < d and k[i + 1] < rt:
+            stack.append((i + 1, rt, p))
+        else:
+            total += 1 - (p << 1)
+        # include‐case (one copy)
+        cost = k[i]
+        if cost < rt:
+            stack.append((i + 1, rt - cost, p ^ 1))
+    return total
+
+
+@njit(cache=True)
+def non_nested_cardinality(k, t):
+    """
+     For each nu in indexset(k,t):
+       if sum((-1)**e for e in abs_e_list(k,t,nu)) != 0
+         add prod(v+1 for (_,v) in nu)
+    —all in one Nopython pass.
+    """
+    d = k.shape[0]
+    total = 0
+    # main stack holds (dim_i, rem_budget, parity, prod_n)
+    stack = [(0, t, 0, 1)]
+    while stack:
+        dim_i, rem_t, parity, prod_n = stack.pop()
+
+        # terminal skip‐branch?
+        if dim_i >= d or not (dim_i + 1 < d and k[dim_i + 1] < rem_t):
+            s = _abs_e_subtree_stack(k, d, rem_t, parity)
+            if s != 0:
+                total += prod_n
+
+        # now expand exactly like your original indexset
+        if dim_i < d:
+            # skip‐branch
+            if dim_i + 1 < d and k[dim_i + 1] < rem_t:
+                stack.append((dim_i + 1, rem_t, parity, prod_n))
+            # include‐branches for all j≥1
+            cost = k[dim_i]
+            j = 1
+            while cost * j < rem_t:
+                new_parity = parity ^ (j & 1)
+                new_prod_n = prod_n * (j + 1)
+                new_rem_t = rem_t - cost * j
+                stack.append((dim_i + 1, new_rem_t, new_parity, new_prod_n))
+                j += 1
+
+    return total
+
+
 def smolyak_coefficient_zeta(k, t: float, *, nu: dict[int, int] = None):
     return np.sum([(-1) ** e for e in abs_e(k, t, nu=nu)])
 
@@ -101,14 +165,7 @@ def dense_index_to_sparse(dense_nu: ArrayLike) -> Tuple[Tuple[int, int], ...]:
 def cardinality(k, t: float, nested: bool = False) -> int:
     if nested:
         return indexset_size(k, t)
-    else:
-        iset = indexset(k, t)
-    n = 0
-    for nu in iset:
-        c = np.sum([(-1) ** e for e in abs_e(k, t, nu=nu)])
-        if c != 0:
-            n += np.prod([v + 1 for _, v in nu])
-    return n
+    return non_nested_cardinality(k, t)
 
 
 def find_suitable_t(k: ArrayLike, m: int = 50, nested: bool = False, max_iter=32, accuracy=0.001) -> int:
