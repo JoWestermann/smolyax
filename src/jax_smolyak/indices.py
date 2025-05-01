@@ -1,6 +1,7 @@
 from typing import Tuple
 
 import numpy as np
+from numba import njit
 from numpy.typing import ArrayLike
 
 
@@ -31,6 +32,34 @@ def indexset(k, t: float):
             j += 1
 
     return result
+
+
+@njit(cache=True)
+def indexset_size(k, t):
+    stack = [(0, 0.0)]
+    count = 0
+
+    while stack:
+        dim_i, used_t = stack.pop()
+
+        if dim_i >= len(k):
+            count += 1
+            continue
+
+        remaining_t = t - used_t
+
+        if dim_i + 1 < len(k) and k[dim_i + 1] < remaining_t:
+            stack.append((dim_i + 1, used_t))
+        else:
+            count += 1
+
+        j = 1
+        while used_t + j * k[dim_i] < t:
+            new_used_t = used_t + j * k[dim_i]
+            stack.append((dim_i + 1, new_used_t))
+            j += 1
+
+    return count
 
 
 def abs_e(k, t, i=0, e=None, *, nu: dict[int, int] = None):
@@ -70,11 +99,10 @@ def dense_index_to_sparse(dense_nu: ArrayLike) -> Tuple[Tuple[int, int], ...]:
 
 
 def cardinality(k, t: float, nested: bool = False) -> int:
-    iset = indexset(k, t)
-
     if nested:
-        return len(iset)
-
+        return indexset_size(k, t)
+    else:
+        iset = indexset(k, t)
     n = 0
     for nu in iset:
         c = np.sum([(-1) ** e for e in abs_e(k, t, nu=nu)])
@@ -98,7 +126,7 @@ def find_suitable_t(k: ArrayLike, m: int = 50, nested: bool = False, max_iter=32
         return 1
 
     # establish search interval
-    l_interval = [1, 2]
+    l_interval = [1.0, 2.0]
     while cardinality(k, l_interval[0], nested) > m:
         l_interval = [l_interval[0] / 1.2, l_interval[0]]
     while cardinality(k, l_interval[1], nested) < m:
@@ -106,7 +134,7 @@ def find_suitable_t(k: ArrayLike, m: int = 50, nested: bool = False, max_iter=32
 
     # bisect search interval
     def midpoint(interval):
-        return interval[0] + (interval[1] - interval[0]) / 2
+        return interval[0] + (interval[1] - interval[0]) / 2.0
 
     t_cand = midpoint(l_interval)
     m_cand = cardinality(k, t_cand, nested)
