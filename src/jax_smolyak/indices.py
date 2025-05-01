@@ -1,3 +1,4 @@
+from typing import Tuple
 import numpy as np
 from numpy.typing import ArrayLike
 
@@ -35,7 +36,7 @@ def abs_e(k, t, i=0, e=None, *, nu: dict[int, int] = None):
     if e is None:
         assert i == 0 and nu is not None
         e = 0
-        t -= np.sum([nu[j] * k[j] for j in nu.keys()])
+        t -= np.sum([v * k[j] for j, v in nu])
     if i >= len(k):
         return [e]
     r = []
@@ -60,17 +61,17 @@ def sparse_index_to_tuple(nu: dict[int, int], check: bool = False) -> tuple:
 
 def sparse_index_to_dense(nu: dict[int, int], dim: int) -> tuple:
     dense_nu = [0] * dim
-    for k, v in nu.items():
+    for k, v in nu:
         dense_nu[k] = v
     return tuple(dense_nu)
 
 
-def dense_index_to_sparse(dense_nu: ArrayLike) -> dict[int, int]:
-    sparse_nu = {}
+def dense_index_to_sparse(dense_nu: ArrayLike) -> Tuple[Tuple[int, int], ...]:
+    sparse_nu = []
     for k, v in enumerate(dense_nu):
         if v > 0:
-            sparse_nu[k] = v
-    return sparse_nu
+            sparse_nu.append((k, v))
+    return tuple(sparse_nu)
 
 
 def cardinality(k, t: float, nested: bool = False) -> int:
@@ -83,7 +84,7 @@ def cardinality(k, t: float, nested: bool = False) -> int:
     for nu in iset:
         c = np.sum([(-1) ** e for e in abs_e(k, t, nu=nu)])
         if c != 0:
-            n += np.prod([v + 1 for v in nu.values()])
+            n += np.prod([v + 1 for _, v in nu])
     return n
 
 
