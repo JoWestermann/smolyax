@@ -1,7 +1,7 @@
-from typing import List, Tuple
+from typing import Tuple
 
 import numpy as np
-from numba import jit, njit
+from numba import njit
 from numpy.typing import ArrayLike
 
 
