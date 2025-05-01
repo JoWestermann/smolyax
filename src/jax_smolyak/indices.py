@@ -1,24 +1,25 @@
 from typing import Tuple
+
 import numpy as np
 from numpy.typing import ArrayLike
 
 
 def indexset(k, t: float):
     stack = [(0, t, ())]
-    result = set()
+    result = []
 
     while stack:
         dim_i, remaining_t, nu = stack.pop()
 
         if dim_i >= len(k):
-            result.add(nu)
+            result.append(nu)
             continue
 
         # Case 1: Try skipping this dimension
         if dim_i + 1 < len(k) and k[dim_i + 1] < remaining_t:
             stack.append((dim_i + 1, remaining_t, nu))
         else:
-            result.add(nu)
+            result.append(nu)
 
         # Case 2: Try all j ≥ 1 while feasible
         j = 1
