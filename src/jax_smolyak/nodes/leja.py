@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 import numpy as np
 from numpy.typing import ArrayLike
 
@@ -16,6 +18,7 @@ class Leja1D(Generator):
         if domain is not None:
             self.domain = np.asarray(domain)
             self._reference_domain = (-1, 1)
+        self.__cached_scaled_call = self.__make_cached_scaled_call()
 
     def __repr__(self) -> str:
         return f"Leja (domain = {self.domain})"
@@ -31,9 +34,16 @@ class Leja1D(Generator):
                 else:
                     cls.nodes[j] = np.sqrt((cls.nodes[int((j + 1) / 2)] + 1) / 2)
 
+    def __make_cached_scaled_call(self):
+        @lru_cache(maxsize=None)
+        def cached(n):
+            self._ensure_nodes(n)
+            return self.scale(self.nodes[: n + 1])
+
+        return cached
+
     def __call__(self, n: int) -> ArrayLike:
-        self._ensure_nodes(n)
-        return self.scale(self.nodes[: n + 1])
+        return self.__cached_scaled_call(n)
 
     def scale(self, x: ArrayLike, d1: ArrayLike = None, d2: ArrayLike = None) -> ArrayLike:
         """
