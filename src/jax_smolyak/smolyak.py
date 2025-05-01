@@ -84,8 +84,8 @@ class SmolyakBarycentricInterpolator:
             self.n_2_argsort_dims[n] = np.empty((nn, n), dtype=int)
 
             for i, nu in enumerate(self.n_2_nus[n]):
-                self.n_2_dims[n][i] = list(nu.keys())
-                sorted_nu = sorted(nu.items(), key=lambda x: x[1], reverse=True)
+                self.n_2_dims[n][i] = list(k for k, _ in nu)
+                sorted_nu = sorted(nu, key=lambda x: x[1], reverse=True)
                 self.n_2_sorted_dims[n][i], self.n_2_sorted_degs[n][i] = zip(*sorted_nu)
                 self.n_2_argsort_dims[n][i] = np.argsort(self.n_2_sorted_dims[n][i])
 
@@ -110,8 +110,8 @@ class SmolyakBarycentricInterpolator:
             self.n_2_weights[n] = [np.zeros((nn, tau_i + 1)) for tau_i in tau]
 
             for i, nu in enumerate(self.n_2_nus[n]):
-                for t, dim in enumerate(self.n_2_sorted_dims[n][i]):
-                    nodes = node_gen[dim](nu[dim])
+                for t, (dim, deg) in enumerate(zip(self.n_2_sorted_dims[n][i], self.n_2_sorted_degs[n][i])):
+                    nodes = node_gen[dim](deg)
                     self.n_2_nodes[n][t][i][: len(nodes)] = nodes
                     self.n_2_weights[n][t][i][: len(nodes)] = barycentric.compute_weights(nodes)
 
@@ -125,7 +125,7 @@ class SmolyakBarycentricInterpolator:
         if self.is_nested:
             self.n_f_evals = len(indxs_all)
         else:
-            self.n_f_evals = int(np.sum([np.prod([si + 1 for si in idx.values()]) for idx in indxs_zeta]))
+            self.n_f_evals = int(np.sum([np.prod([si + 1 for _, si in idx]) for idx in indxs_zeta]))
         self.n_f_evals_new = 0
 
         self.__compiledfuncs = {}
@@ -163,18 +163,18 @@ class SmolyakBarycentricInterpolator:
             f_evals = {}
 
         # Special case n = 0
-        nu_tuple = indices.sparse_index_to_tuple({})
+        nu = ()
         if self.is_nested:
             f_evals_nu = f_evals
         else:
-            f_evals_nu = f_evals.get(nu_tuple, {})
-        if nu_tuple not in f_evals_nu.keys():
-            f_evals_nu[nu_tuple] = f(self.zero.copy())
+            f_evals_nu = f_evals.get(nu, {})
+        if nu not in f_evals_nu.keys():
+            f_evals_nu[nu] = f(self.zero.copy())
             self.n_f_evals_new += 1
-        self.offset *= f_evals_nu[nu_tuple]
+        self.offset *= f_evals_nu[nu]
 
         if not self.is_nested:
-            f_evals[nu_tuple] = f_evals_nu
+            f_evals[nu] = f_evals_nu
 
         # n > 0
         for n in self.n_2_F.keys():
@@ -182,17 +182,16 @@ class SmolyakBarycentricInterpolator:
             for i, nu in enumerate(self.n_2_nus[n]):
                 x = self.zero.copy()
 
-                nu_tuple = indices.sparse_index_to_tuple(nu)
                 if self.is_nested:
                     f_evals_nu = f_evals
                 else:
-                    f_evals_nu = f_evals.get(nu_tuple, {})
+                    f_evals_nu = f_evals.get(nu, {})
 
                 s_i = self.n_2_sorted_dims[n][i]
                 argsort_s_i = self.n_2_argsort_dims[n][i]
                 F_i = self.n_2_F[n][i]
 
-                ranges = [range(nu[j] + 1) for j in s_i]
+                ranges = [range(k + 1) for k in self.n_2_sorted_degs[n][i]]
                 for mu_degrees in it.product(*ranges):
                     mu_tuple = tuple((s_i[i], mu_degrees[i]) for i in argsort_s_i if mu_degrees[i] > 0)
                     if mu_tuple not in f_evals_nu:
@@ -202,7 +201,7 @@ class SmolyakBarycentricInterpolator:
                     F_i[:, *mu_degrees] = f_evals_nu[mu_tuple]
 
                 if not self.is_nested:
-                    f_evals[nu_tuple] = f_evals_nu
+                    f_evals[nu] = f_evals_nu
 
             # cast to jnp data structures
             self.n_2_F[n] = jnp.array(self.n_2_F[n])

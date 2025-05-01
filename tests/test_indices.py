@@ -64,7 +64,12 @@ def test_smolyak_coefficients():
     for i in range(10):
         k, t, isparse, idense = get_random_indexsets(nested=(i % 2) == 0)
 
-        for nu_1, nu_2 in zip(isparse, idense):
-            c_1 = indices_sparse.smolyak_coefficient_zeta(k, t, nu=nu_1)
-            c_2 = indices_dense.smolyak_coefficient_zeta(k, t, nu=nu_2)
-            assert c_1 == c_2
+        for nu_sparse in isparse:
+            nu_dense = indices_sparse.sparse_index_to_dense(nu_sparse, dim=len(k))
+            assert nu_dense in idense
+            c_sparse = indices_sparse.smolyak_coefficient_zeta(k, t, nu=nu_sparse)
+            c_dense = indices_dense.smolyak_coefficient_zeta(k, t, nu=nu_dense)
+            assert c_sparse == c_dense, (
+                f"Assertion failed for nu_sparse={nu_sparse}, c_sparse={c_sparse}"
+                + " and nu_dense={nu_dense}, c_dense={c_dense}"
+            )
