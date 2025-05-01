@@ -2,21 +2,33 @@ import numpy as np
 from numpy.typing import ArrayLike
 
 
-def indexset(k, t: float, i: int = 0, nu: dict[int, int] = None):
-    if nu is None:
-        nu = {}
-    if i >= len(k):
-        return [nu]
-    r = []
-    if i + 1 < len(k) and k[i + 1] < t:
-        r += indexset(k, t, i + 1, nu)
-    else:
-        r += [nu]
-    j = 1
-    while j * k[i] < t:
-        r += indexset(k, t - j * k[i], i + 1, {**nu, i: j})
-        j += 1
-    return r
+def indexset(k, t: float):
+    stack = [(0, t, ())]
+    result = set()
+
+    while stack:
+        dim_i, remaining_t, nu = stack.pop()
+
+        if dim_i >= len(k):
+            result.add(nu)
+            continue
+
+        # Case 1: Try skipping this dimension
+        if dim_i + 1 < len(k) and k[dim_i + 1] < remaining_t:
+            stack.append((dim_i + 1, remaining_t, nu))
+        else:
+            result.add(nu)
+
+        # Case 2: Try all j ≥ 1 while feasible
+        j = 1
+        while j * k[dim_i] < remaining_t:
+            # Create new sparse index
+            nu_extended = tuple(list(nu) + [(dim_i, j)])
+            new_t = remaining_t - j * k[dim_i]
+            stack.append((dim_i + 1, new_t, nu_extended))
+            j += 1
+
+    return result
 
 
 def abs_e(k, t, i=0, e=None, *, nu: dict[int, int] = None):
