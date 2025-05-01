@@ -54,12 +54,6 @@ def smolyak_coefficient_zeta(k, t: float, *, nu: dict[int, int] = None):
     return np.sum([(-1) ** e for e in abs_e(k, t, nu=nu)])
 
 
-def sparse_index_to_tuple(nu: dict[int, int], check: bool = False) -> tuple:
-    if check:
-        assert list(nu.keys()) == sorted(nu.keys())
-    return tuple(nu.items())
-
-
 def sparse_index_to_dense(nu: dict[int, int], dim: int) -> tuple:
     dense_nu = [0] * dim
     for k, v in nu:
