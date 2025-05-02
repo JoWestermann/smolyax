@@ -168,14 +168,37 @@ def cardinality(k, t: float, nested: bool = False) -> int:
     return non_nested_cardinality(k, t)
 
 
-def find_suitable_t(k: ArrayLike, m: int = 50, nested: bool = False, max_iter=32, accuracy=0.001) -> int:
+def find_approximate_threshold(k: ArrayLike, m: int, nested: bool, max_iter: int = 32, accuracy: float = 0.001) -> int:
     """
-    k : weight vector of the anisotropy of the multi-index set
-    m : target cardinality of the set of interpolation nodes
-    nested : flag to indicate whether nested or non-nested interpolation nodes are used
-    max_iter : maximal number of bisection iterations
-    accuracy : relative tolerance within which the cardinality of the set of interpolation nodes may deviate from m
-    returns t : threshold parameter to construct a k-weighted multi-index set of size (roughly) m
+    Find the approximate threshold parameter to construct a k-weighted multi-index set such that the set of
+    corresponding interpolation nodes has a cardinality of approximately `m`.
+
+    Parameters
+    ----------
+    k : ArrayLike
+        Weight vector of the anisotropy of the multi-index set.
+    m : int
+        Target cardinality of the set of interpolation nodes.
+    nested : bool
+        Flag to indicate whether nested or non-nested interpolation nodes are used.
+    max_iter : int, optional
+        Maximal number of bisection iterations. Default is 32.
+    accuracy : float, optional
+        Relative tolerance within which the cardinality of the set of interpolation nodes may deviate from `m`.
+        Note that the accuracy may not be reached if the maximum number of iterations `max_iter` is exhausted.
+        Default is 0.001.
+
+    Returns
+    -------
+    int
+        Threshold parameter `t` to construct a k-weighted multi-index set of size approximately `m`.
+
+    Notes
+    -----
+    * The function uses a bisection method to find the threshold parameter `t` such that the cardinality
+      of the set of interpolation nodes is approximately equal to `m`.
+    * When `nested` is True, the cardinality of the index set is equal to the cardinality of the set of
+      interpolation nodes.
     """
     assert m > 0
 
