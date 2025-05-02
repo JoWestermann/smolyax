@@ -79,31 +79,6 @@ def abs_e(k, t, i=0, e=None, *, nu: dict[int, int] = None):
 
 
 @njit(cache=True)
-def _abs_e_subtree_stack(k, d, rem_t, _):
-    """
-    Iterative subtree‐sum helper that ALWAYS begins with parity=0,
-    mirroring abs_e_list’s reset of e=0 after subtracting the prefix.
-    """
-    total = 0
-    stack = [(0, rem_t, 0)]
-    while stack:
-        i, rt, p = stack.pop()
-        if i >= d:
-            total += 1 - (p << 1)
-            continue
-        # skip‐case
-        if i + 1 < d and k[i + 1] < rt:
-            stack.append((i + 1, rt, p))
-        else:
-            total += 1 - (p << 1)
-        # include‐case (one copy only)
-        c = k[i]
-        if c < rt:
-            stack.append((i + 1, rt - c, p ^ 1))
-    return total
-
-
-@njit(cache=True)
 def _abs_e_subtree_stack(k, d, rem_t, parity):
     """
     Suffix sum of (-1)^e exactly matching abs_e_list:
@@ -206,8 +181,8 @@ def non_zero_indices_and_zetas(k, t):
         i, rem_t, nu = stack.pop()
         # terminal skip check
         if i >= d or not (i + 1 < d and k[i + 1] < rem_t):
-            ζ = _subtree_zeta(k, d, rem_t)
-            if ζ != 0:
+            zeta = _subtree_zeta(k, d, rem_t)
+            if zeta != 0:
                 n = len(nu)
                 n2nus[n].append(nu)
                 n2zetas[n].append(ζ)
@@ -240,6 +215,7 @@ def dense_index_to_sparse(dense_nu: ArrayLike) -> Tuple[Tuple[int, int], ...]:
 def cardinality(k, t: float, nested: bool = False) -> int:
     if nested:
         return indexset_size(k, t)
+    assert non_nested_cardinality(k, t) == non_nested_cardinality2(k, t)
     return non_nested_cardinality(k, t)
 
 
