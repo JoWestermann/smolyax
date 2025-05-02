@@ -38,7 +38,7 @@ def setup_nodes(d, nested, centered):
 def d_test_smolyak_constructor_runtime(benchmark, d, m, nested, centered):
     node_gen = setup_nodes(d, nested, centered)
     k = np.log([2 + i for i in range(d)]) / np.log(2)
-    t = indices.find_suitable_t(k, m)
+    t = indices.find_approximate_threshold(k, m, nested)
     benchmark(lambda: smolyak.SmolyakBarycentricInterpolator(node_gen=node_gen, k=k, t=t, d_out=10))
 
 
@@ -62,6 +62,6 @@ def target_f(x, theta, r):
 def test_smolyak_set_f_runtime(benchmark, d, m, nested, centered):
     node_gen = setup_nodes(d, nested, centered)
     k = np.log([2 + i for i in range(d)]) / np.log(2)
-    t = indices.find_suitable_t(k, m)
+    t = indices.find_approximate_threshold(k, m, nested)
     f = lambda x: target_f(x, 2.0, 2.0)
     benchmark(lambda: smolyak.SmolyakBarycentricInterpolator(node_gen=node_gen, k=k, t=t, d_out=1, f=f))

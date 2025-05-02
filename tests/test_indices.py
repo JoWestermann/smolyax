@@ -14,7 +14,7 @@ def get_random_indexsets(nested: bool = False):
     k = np.log([a + b * i for i in range(d)]) / np.log(a)
 
     n_t = np.random.randint(low=1, high=100)
-    t = indices_sparse.find_suitable_t(k, n_t, nested=nested)
+    t = indices_sparse.find_approximate_threshold(k, n_t, nested=nested)
 
     isparse = indices_sparse.indexset(k, t)
     idense = indices_dense.indexset(k, t)
