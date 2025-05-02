@@ -102,12 +102,13 @@ def _abs_e_subtree_stack(k, d, rem_t, parity):
             stack.append((i + 1, rt - cost, p ^ 1))
     return total
 
+
 @njit(cache=True)
 def non_nested_cardinality(k, t):
     """
-     For each nu in indexset(k,t):
-       if sum((-1)**e for e in abs_e_list(k,t,nu)) != 0
-         add prod(v+1 for (_,v) in nu)
+    For each nu in indexset(k,t):
+    if sum((-1)**e for e in abs_e_list(k,t,nu)) != 0
+    add prod(v+1 for (_,v) in nu)
     —all in one Nopython pass.
     """
     d = k.shape[0]
