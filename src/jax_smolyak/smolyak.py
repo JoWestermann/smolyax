@@ -11,6 +11,11 @@ from . import barycentric, indices, nodes
 jax.config.update("jax_enable_x64", True)
 
 rng_key = jax.random.PRNGKey(0)
+from collections import Counter, defaultdict
+
+
+def max_fn(n_2_sorted_degs, n):
+    return np.max(n_2_sorted_degs[n], axis=0)
 
 
 class SmolyakBarycentricInterpolator:
@@ -69,29 +74,14 @@ class SmolyakBarycentricInterpolator:
             self.set_f(f=f, batchsize=batchsize)
 
     def __init_indices_data(self, k: ArrayLike, t: float):
-
-        indxs_all = indices.indexset(k, t)
-
-        indxs_zeta = []
-        self.n_2_nus = {}
-        self.n_2_zetas = {}
-
-        for nu in indxs_all:
-            zeta = indices.smolyak_coefficient_zeta(k, t, nu=nu)
-            if zeta != 0:
-                indxs_zeta.append(nu)
-                n = len(nu)
-                self.n_2_nus[n] = self.n_2_nus.get(n, []) + [nu]
-                self.n_2_zetas[n] = self.n_2_zetas.get(n, []) + [zeta]
+        self.n_2_nus, self.n_2_zetas = indices.non_zero_indices_and_zetas(k, t)
 
         # Tracking number of evaluations of the interpolation target f.
         #   - self.n_f_evals tracks the total number of function evaluations used by the interpolator
         #   - self.n_f_evals_new counts only new function calls.
         # If evaluations are reused across interpolator instances, then likely self.n_f_evals_new < self.n_f_evals
-        if self.is_nested:
-            self.n_f_evals = len(indxs_all)
-        else:
-            self.n_f_evals = int(np.sum([np.prod([si + 1 for _, si in idx]) for idx in indxs_zeta]))
+
+        self.n_f_evals = indices.cardinality(k, t, nested=self.is_nested)
         self.n_f_evals_new = 0
 
     def __init_indices_sorting(self):
@@ -128,7 +118,7 @@ class SmolyakBarycentricInterpolator:
                 continue
 
             nn = len(self.n_2_nus[n])  # number of indices in lambda_n
-            tau = np.max(self.n_2_sorted_degs[n], axis=0)
+            tau = max_fn(self.n_2_sorted_degs, n)  # should store max when constructing.
 
             self.n_2_F[n] = np.zeros((nn, self.d_out) + tuple(tau_i + 1 for tau_i in tau))
             self.n_2_nodes[n] = [np.zeros((nn, tau_i + 1)) for tau_i in tau]
