@@ -51,9 +51,26 @@ class SmolyakBarycentricInterpolator:
         self.d_out = d_out
         self._is_nested = node_gen.is_nested
 
-        indxs_all = indices.indexset(k, t)
+        # Step 1 : Bin multiindices and smolyak coefficients by the number of active dimensions, n
+        self.__init_indices_data(k, t)
 
-        # Step 1 : Sort multiindices and smolyak coefficients by the number of active dimensions, n
+        # Step 2 : Compute sorted dimensions and sorted degrees for all multi-indices
+        self.__init_indices_sorting()
+
+        # Step 3 : Allocate and prefill data
+        self.__init_nodes_and_weights(node_gen)
+
+        # Caching the interpolation node for nu = (0,0,...,0) for reuse in self.set_f
+        self.zero = node_gen.get_zero()
+
+        self.__compiledfuncs = {}
+
+        if f is not None:
+            self.set_f(f=f, batchsize=batchsize)
+
+    def __init_indices_data(self, k: ArrayLike, t: float):
+
+        indxs_all = indices.indexset(k, t)
 
         indxs_zeta = []
         self.n_2_nus = {}
@@ -67,8 +84,17 @@ class SmolyakBarycentricInterpolator:
                 self.n_2_nus[n] = self.n_2_nus.get(n, []) + [nu]
                 self.n_2_zetas[n] = self.n_2_zetas.get(n, []) + [zeta]
 
-        # Step 2 : Compute sorted dimensions and sorted degrees for all multi-indices
+        # Tracking number of evaluations of the interpolation target f.
+        #   - self.n_f_evals tracks the total number of function evaluations used by the interpolator
+        #   - self.n_f_evals_new counts only new function calls.
+        # If evaluations are reused across interpolator instances, then likely self.n_f_evals_new < self.n_f_evals
+        if self.is_nested:
+            self.n_f_evals = len(indxs_all)
+        else:
+            self.n_f_evals = int(np.sum([np.prod([si + 1 for _, si in idx]) for idx in indxs_zeta]))
+        self.n_f_evals_new = 0
 
+    def __init_indices_sorting(self):
         self.n_2_dims = {}
         self.n_2_sorted_dims = {}
         self.n_2_sorted_degs = {}
@@ -89,8 +115,7 @@ class SmolyakBarycentricInterpolator:
                 self.n_2_sorted_dims[n][i], self.n_2_sorted_degs[n][i] = zip(*sorted_nu)
                 self.n_2_argsort_dims[n][i] = np.argsort(self.n_2_sorted_dims[n][i])
 
-        # Step 3 : Allocate and prefill data
-
+    def __init_nodes_and_weights(self, node_gen):
         self.offset = 0
         self.n_2_F = {}
         self.n_2_nodes = {}
@@ -105,7 +130,7 @@ class SmolyakBarycentricInterpolator:
             nn = len(self.n_2_nus[n])  # number of indices in lambda_n
             tau = np.max(self.n_2_sorted_degs[n], axis=0)
 
-            self.n_2_F[n] = np.zeros((nn, d_out) + tuple(tau_i + 1 for tau_i in tau))
+            self.n_2_F[n] = np.zeros((nn, self.d_out) + tuple(tau_i + 1 for tau_i in tau))
             self.n_2_nodes[n] = [np.zeros((nn, tau_i + 1)) for tau_i in tau]
             self.n_2_weights[n] = [np.zeros((nn, tau_i + 1)) for tau_i in tau]
 
@@ -114,24 +139,6 @@ class SmolyakBarycentricInterpolator:
                     nodes = node_gen[dim](deg)
                     self.n_2_nodes[n][t][i][: len(nodes)] = nodes
                     self.n_2_weights[n][t][i][: len(nodes)] = barycentric.compute_weights(nodes)
-
-        # Caching the interpolation node for nu = (0,0,...,0) for reuse in self.set_f
-        self.zero = node_gen.get_zero()
-
-        # Tracking number of evaluations of the interpolation target f.
-        #   - self.n_f_evals tracks the total number of function evaluations used by the interpolator
-        #   - self.n_f_evals_new counts only new function calls.
-        # If evaluations are reused across interpolator instances, then likely self.n_f_evals_new < self.n_f_evals
-        if self.is_nested:
-            self.n_f_evals = len(indxs_all)
-        else:
-            self.n_f_evals = int(np.sum([np.prod([si + 1 for _, si in idx]) for idx in indxs_zeta]))
-        self.n_f_evals_new = 0
-
-        self.__compiledfuncs = {}
-
-        if f is not None:
-            self.set_f(f=f, batchsize=batchsize)
 
     def set_f(
         self,
