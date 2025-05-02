@@ -26,7 +26,7 @@ def indexset(k, t: float):
         j = 1
         while j * k[dim_i] < remaining_t:
             # Create new sparse index
-            nu_extended = tuple(list(nu) + [(dim_i, j)])
+            nu_extended = nu + ((dim_i, j),)
             new_t = remaining_t - j * k[dim_i]
             stack.append((dim_i + 1, new_t, nu_extended))
             j += 1
