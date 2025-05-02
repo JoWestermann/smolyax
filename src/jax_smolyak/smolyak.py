@@ -11,65 +11,7 @@ from . import barycentric, indices, nodes
 jax.config.update("jax_enable_x64", True)
 
 rng_key = jax.random.PRNGKey(0)
-from collections import Counter, defaultdict
-
-def compare_all_smolyak_results(
-    old_F, new_F,
-    old_nodes, new_nodes,
-    old_weights, new_weights,
-    tol=1e-12
-):
-    # 1) Compare F dictionaries
-    all_ns = set(old_F) | set(new_F)
-    for n in sorted(all_ns):
-        assert n in old_F, f"n={n} missing in old_F"
-        assert n in new_F, f"n={n} missing in new_F"
-        A = old_F[n]
-        B = new_F[n]
-        assert A.shape == B.shape, f"n={n}: F shape mismatch {A.shape} vs {B.shape}"
-        if not np.allclose(A, B, atol=tol, equal_nan=True):
-            diff = np.abs(A - B)
-            idx = np.unravel_index(np.nanargmax(diff), diff.shape)
-            raise AssertionError(
-                f"n={n}: F max |Δ|={diff[idx]:.3e} at index {idx}"
-            )
-
-    # 2) Compare nodes & weights (as before)
-    for n in sorted(all_ns):
-        assert n in old_nodes,   f"n={n} missing in old_nodes"
-        assert n in new_nodes,   f"n={n} missing in new_nodes"
-        assert n in old_weights, f"n={n} missing in old_weights"
-        assert n in new_weights, f"n={n} missing in new_weights"
-
-        old_nd = old_nodes[n]; new_nd = new_nodes[n]
-        old_wd = old_weights[n]; new_wd = new_weights[n]
-        assert len(old_nd) == len(new_nd), f"n={n}: #slots mismatch nodes {len(old_nd)} vs {len(new_nd)}"
-        assert len(old_wd) == len(new_wd), f"n={n}: #slots mismatch weights {len(old_wd)} vs {len(new_wd)}"
-        slots = len(old_nd)
-
-        for t in range(slots):
-            A = old_nd[t]; B = new_nd[t]
-            assert A.shape == B.shape, f"n={n}, slot={t}: nodes shape {A.shape} vs {B.shape}"
-            if not np.allclose(A, B, atol=tol, equal_nan=True):
-                diff = np.abs(A - B)
-                i,j = np.unravel_index(np.nanargmax(diff), diff.shape)
-                raise AssertionError(
-                    f"n={n}, slot={t}, nodes max |Δ|={diff[i,j]:.3e} at index ({i},{j})"
-                )
-
-            WA = old_wd[t]; WB = new_wd[t]
-            assert WA.shape == WB.shape, f"n={n}, slot={t}: weights shape {WA.shape} vs {WB.shape}"
-            if not np.allclose(WA, WB, atol=tol, equal_nan=True):
-                diff = np.abs(WA - WB)
-                i,j = np.unravel_index(np.nanargmax(diff), diff.shape)
-                raise AssertionError(
-                    f"n={n}, slot={t}, weights max |Δ|={diff[i,j]:.3e} at index ({i},{j})"
-                )
-
-    print("✅ All F, nodes & weights match within tol=", tol)
-
-def max_fn(n_2_sorted_degs, n):
-    return np.max(n_2_sorted_degs[n], axis=0)
+from collections import defaultdict
 
 
 class SmolyakBarycentricInterpolator:
@@ -118,7 +60,7 @@ class SmolyakBarycentricInterpolator:
 
         # Step 3 : Allocate and prefill data
         self.__init_nodes_and_weights()
-    
+
         # Caching the interpolation node for nu = (0,0,...,0) for reuse in self.set_f
         self.zero = node_gen.get_zero()
 
@@ -158,7 +100,7 @@ class SmolyakBarycentricInterpolator:
                 sorted_nu = sorted(nu, key=lambda x: x[1], reverse=True)
                 self.n_2_sorted_dims[n][i], self.n_2_sorted_degs[n][i] = zip(*sorted_nu)
                 self.n_2_argsort_dims[n][i] = np.argsort(self.n_2_sorted_dims[n][i])
-    
+
     def __build_nodes_weights(self, sorted_dims, sorted_degs):
         """
         Build lists of per-slot (nn, tau_i+1) arrays of nodes & weights.
@@ -176,15 +118,15 @@ class SmolyakBarycentricInterpolator:
         nn, n_dims = sorted_dims.shape
 
         # compute per-slot max degree tau_i
-        tau = sorted_degs.max(axis=0).astype(int)
+        tau = sorted_degs.max(axis=0).astype(int)  # we might want to just keep track of this during construction!
 
         # pre-allocate output arrays
-        nodes_list   = [np.zeros((nn, tau_i+1), dtype=float) for tau_i in tau]
-        weights_list = [np.zeros((nn, tau_i+1), dtype=float) for tau_i in tau]
+        nodes_list = [np.zeros((nn, tau_i + 1), dtype=float) for tau_i in tau]
+        weights_list = [np.zeros((nn, tau_i + 1), dtype=float) for tau_i in tau]
 
         # for each slot t, group i's by (dim,deg) so we only gen once
         for t in range(n_dims):
-            groups: dict[tuple[int,int], list[int]] = defaultdict(list)
+            groups: dict[tuple[int, int], list[int]] = defaultdict(list)
             for i in range(nn):
                 dim = int(sorted_dims[i, t])
                 deg = int(sorted_degs[i, t])
@@ -192,19 +134,19 @@ class SmolyakBarycentricInterpolator:
 
             # now for each unique (dim,deg) compute pts & wts once
             for (dim, deg), idxs in groups.items():
-                pts = self.__node_gen[dim](deg) 
+                pts = self.__node_gen[dim](deg)
                 wts = barycentric.compute_weights(pts)
                 L = len(pts)
-                # these are C-contiguous writes along the last axis
-                nodes_list[t][idxs, :L]   = pts
+                # Better memory access
+                nodes_list[t][idxs, :L] = pts
                 weights_list[t][idxs, :L] = wts
-            #we can do even better if we vectorize node_gen(degrees) for isotropic rules, like GH or Leja
+            # we can do even better if we vectorize node_gen(degrees) for isotropic rules, like GH or Leja
         return nodes_list, weights_list
 
     def __init_nodes_and_weights(self):
-        self.offset      = 0
-        self.n_2_F       = {}
-        self.n_2_nodes   = {}
+        self.offset = 0
+        self.n_2_F = {}
+        self.n_2_nodes = {}
         self.n_2_weights = {}
 
         for n, nus in self.n_2_nus.items():
@@ -214,24 +156,17 @@ class SmolyakBarycentricInterpolator:
                 self.offset = self.n_2_zetas[n][0]
                 continue
 
-            nn = len(nus) # number of multi-indices of length n
+            nn = len(nus)  # number of multi-indices of length n
             # per-slot max degree tau_i
             sorted_degs = np.array(self.n_2_sorted_degs[n], dtype=int)
             tau = tuple(int(ti) for ti in sorted_degs.max(axis=0))
 
             # allocate the F array
-            self.n_2_F[n] = np.zeros(
-                (nn, self.d_out) + tuple(ti+1 for ti in tau),
-                dtype=float
-            )
+            self.n_2_F[n] = np.zeros((nn, self.d_out) + tuple(ti + 1 for ti in tau), dtype=float)
 
-            # prepare the sorted_dims / sorted_degs arrays
-            sorted_dims = np.array(self.n_2_sorted_dims[n], dtype=int)
-            # sorted_degs already defined above
-
-            # build packed nodes & weights
+            # build  nodes & weights via slicing
             self.n_2_nodes[n], self.n_2_weights[n] = self.__build_nodes_weights(
-                sorted_dims, sorted_degs
+                np.array(self.n_2_sorted_dims[n], dtype=int), sorted_degs
             )
 
     def set_f(
