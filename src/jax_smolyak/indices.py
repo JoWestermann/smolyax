@@ -10,23 +10,21 @@ def indexset(k, t: float):
     result = []
 
     while stack:
-        dim_i, remaining_t, nu = stack.pop()
+        dim_i, remaining_t, nu_head = stack.pop()
 
-        if dim_i >= len(k):
-            result.append(nu)
+        # Check if the index nu_head is final
+
+        if dim_i >= len(k) or k[dim_i] >= remaining_t:
+            result.append(nu_head)
             continue
 
-        # Case 1: Try skipping this dimension
-        if dim_i + 1 < len(k) and k[dim_i + 1] < remaining_t:
-            stack.append((dim_i + 1, remaining_t, nu))
-        else:
-            result.append(nu)
+        # Otherwise add all possible extensions of nu_head onto the stack
 
-        # Case 2: Try all j ≥ 1 while feasible
+        stack.append((dim_i + 1, remaining_t, nu_head))
+
         j = 1
         while j * k[dim_i] < remaining_t:
-            # Create new sparse index
-            nu_extended = nu + ((dim_i, j),)
+            nu_extended = nu_head + ((dim_i, j),)
             new_t = remaining_t - j * k[dim_i]
             stack.append((dim_i + 1, new_t, nu_extended))
             j += 1
