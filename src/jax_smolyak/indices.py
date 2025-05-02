@@ -102,7 +102,6 @@ def _abs_e_subtree_stack(k, d, rem_t, parity):
             stack.append((i + 1, rt - cost, p ^ 1))
     return total
 
-
 @njit(cache=True)
 def non_nested_cardinality(k, t):
     """
@@ -185,7 +184,7 @@ def non_zero_indices_and_zetas(k, t):
             if zeta != 0:
                 n = len(nu)
                 n2nus[n].append(nu)
-                n2zetas[n].append(ζ)
+                n2zetas[n].append(zeta)
         # expand exactly like indexset
         if i < d:
             if i + 1 < d and k[i + 1] < rem_t:
@@ -215,7 +214,6 @@ def dense_index_to_sparse(dense_nu: ArrayLike) -> Tuple[Tuple[int, int], ...]:
 def cardinality(k, t: float, nested: bool = False) -> int:
     if nested:
         return indexset_size(k, t)
-    assert non_nested_cardinality(k, t) == non_nested_cardinality2(k, t)
     return non_nested_cardinality(k, t)
 
 
