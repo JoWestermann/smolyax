@@ -1,5 +1,5 @@
 ---
-title: 'jax-smolyak: A HPC-capable implementation of the Smolyak interpolation operator'
+title: 'jax-smolyak: A high-performance implementation of the Smolyak interpolation operator'
 tags:
   - Python
   - JAX
@@ -7,9 +7,10 @@ tags:
   - HPC
   - Smolyak
   - Sparse Grids
+  - Polynomial Chaos
 authors:
   - name: Josephine Westermann
-    orcid: 0000-0000-0000-0000
+    orcid: 0000-0003-3450-9166
     affiliation: 1
     corresponding: true
   - name: Joshua Chen
@@ -45,15 +46,25 @@ header-includes:
 
 # Summary
 
-**[TODO]**
+The `jax-smolyak` library provides interpolation capabilities for arbitrary multivariate and vector-valued functions $f : \mathbb{R}^{d_1} \to \mathbb{R}^{d_2}$ for any $d_1, d_2 \in \mathbb{N}$.
 
-# Statement of need
+It implements the Smolyak interpolation operator, which is known to overcome the curse-of-dimensionality plaguing naive multivariate interpolation. The implementation is based on JAX [@jax:2018], a free and open-source Python library for high-performance computing that integrates seamlessly with the Python ecosystem. Thanks to JAX's device management, `jax-smolyak` runs natively on both CPU and GPU. While implementing Smolyak interpolation in JAX is challenging due to the highly irregular data structures involved, `jax-smolyak` overcomes this by employing a tailored batching and padding strategy (described below), enabling efficient vectorization, scalability, and parallel execution.
 
-**[TODO]**
+`jax-smolyak` supports interpolation on sparse grids based on either Leja [@chkifa:2013] or Gauss-Hermite interpolation nodes and characterized by anisotropic multi-index sets of the form
+$$
+\Lambda_{\bsk, \ell} := \{\bsnu \in \mathbb{N}_0^{d_1} : \sum_{j=1}^{d_1} k_j \nu_j < \ell\},
+$$
+where $\bsk \in \mathbb{R}^{d_1}$. In the special case $\bsk = (1)_{j=1}^{d_1}$, this reduces to the classical total-degree multi-index set. Additional types of interpolation nodes or multi-index sets can be incorporated easily by implementing a minimalistic interface.
+
+# Statement of Need
+
+Polynomial approximation is a well-studied and powerful tool in applied mathematics, with important applications, for example, in surrogate modeling and uncertainty quantification. Due to their deterministic construction and the availability of error bounds for a wide range of function classes, polynomial surrogates can serve as both a reliable and cost-effective alternative to neural networks — for example, in constructing operator surrogates [@herrmann:2024; @westermann:2025].
+
+While several libraries provide high-dimensional interpolation functionality, none, to our knowledge, provides a hardware-agnostic, high performance implementation. `jax-smolyak` addresses this gap by providing an efficient solution within the popular JAX ecosystem.
 
 # High-dimensional interpolation with the Smolyak operator
 
-We briefly summarize the essentials of high-dimensional interpolation, where sparse grids have become the standard choice for interpolation points. In this setting, the interpolation operator is commonly referred to as the Smolyak operator. This overview provides background and establishes notation, which will be used to describe our specific implementation choices in the next section.
+We briefly summarize the essentials of high-dimensional interpolation, where sparse grids have become the standard choice for interpolation points. In this setting, the interpolation operator is commonly referred to as the Smolyak operator. This overview provides background and establishes notation, which will be used to describe our specific implementation choices in the next section. For ease of notation, the following discussions we will focus on scalar-valued interpolation targets (i.e., on the case $d_1 = d$ and $d_2 = 1$), while the extension to vector-valued functions is straightforward.
 
 **Univariate interpolation.** Given a domain $D \subset \R$ and set of $\nu \in \N$ pairwise distinct interpolation points $(\xi^\nu_i)_{i=0}^\nu \subset D$, the polynomial interpolation operator $I^\nu : C^0(D) \to \bbP_\nu := {\rm span} \set{x^i}{i=0,\dots,\nu}$ maps a function $f : D \to \R$ onto the unique polynomial $I^\nu [f]$ of maximal degree $\nu$ such that $f(\xi^\nu_i) = I^\nu [f](\xi^\nu_i)$ for all $i\in\{0,1,\dots,\nu\}$.
 
@@ -97,9 +108,9 @@ and vectors $\bsb^{\nu_j} (x_j) \in \R^{\nu_j+1}$ given as
 
 # Vectorizable implementation of the Smolyak operator for HPC
 
-To leverage key HPC techniques such as vectorization, parallelization, and batch processing, input data must conform to a uniform structure. However, the vectors and tensors in \eqref{eq:ip_smolyak} together with \eqref{eq:ip_tensorproduct} can exhibit a wide range of shapes, posing a challenge for efficient vectorization. A naive approach would be to zero-pad all tensors $\bsF^\bsnu$ in \eqref{eq:ip_smolyak} to the smallest possible common shape $(\max_{\bsnu \in \Lambda}(\nu_j))_{j=1}^d$. This approach, however, suffers from the curse of dimensionality, as memory requirements grow exponentially with $d$. With our implementation we navigate in between these two extremes of handling a large number of small tensors and a single, massive tensor. The key idea is to set up all tensors by:
+To leverage key HPC techniques such as vectorization, parallelization, and batch processing, input data must conform to a uniform structure. However, the vectors and tensors in \eqref{eq:ip_smolyak} together with \eqref{eq:ip_tensorproduct} can exhibit a wide range of shapes, posing a challenge for efficient vectorization. A naive approach would be to zero-pad all tensors $\bsF^\bsnu$ in \eqref{eq:ip_smolyak} to the smallest possible common shape $(\max_{\bsnu \in \Lambda}(\nu_j))_{j=1}^d$. This approach, however, suffers from the curse-of-dimensionality, as memory requirements grow exponentially with $d$. With our implementation we navigate in between these two extremes of handling a large number of small tensors and a single, massive tensor. The key idea is to set up all tensors by:
 \begin{itemize}
-\item[1.] Dropping indices ("\textit{squeezing}") $j$ of non-active dimensions, i.e., those with $\nu_j = 0$,
+\item[1.] Dropping indices ("\textit{squeezing}") of non-active dimensions, i.e., $j$ with $\nu_j = 0$,
 \item[2.] Permuting the remaining active dimensions in descending order, and
 \item[3.] Zero-padding all tensors with the same number of active dimensions to the smallest common shape.
 \end{itemize}
@@ -170,19 +181,10 @@ We now have everything in place to construct the Smolyak interpolant in a form t
   \end{algorithmic}
 \end{algorithm}
 
-# Software capabilities of \textsc{jax-smolyak}
-
-The library provides interpolation capabilities for arbitrary multivariate and vector-valued functions $f : \mathbb{R}^{d_1} \to \mathbb{R}^{d_2}$ for any $d_1, d_2 \in \mathbb{N}$. While the previous discussion focused on scalar-valued interpolation targets (i.e., the case $d_2 = 1$), the extension to vector-valued functions is straightforward and works seamlessly, provided that all interpolants in the codomain are constructed using the same multi-index set $\Lambda$.
-
-The quality of the interpolation depends on the smoothness of $f$ and the choice of interpolation nodes $\xi$ and multi-index sets $\Lambda$. Suitable choices have been extensively studied in the literature (see, e.g., **[TODO:  references]**).
-
-This repository includes generators for Leja and Gauss-Hermite interpolation nodes, as well as multi-index sets of the form
-$$\Lambda_{\bsk, t} := \{\bsnu \in \mathbb{N}_0^{d_1} \ : \  \sum_{j=1}^{d_1} k_j \nu_j < t\}.$$
-where $\bsk \in \mathbb{R}^{d_1}$ satisfies $k_j \le k_{j+1}$ for all $j=1, \dots, d_1 - 1$. In the special case $\bsk = (1)_{j=1}^{d_1}$, this reduces to the classical total-degree multi-index set.
-
-Additional interpolation nodes or multi-index sets can be incorporated with minimal effort by implementing a minimalistic interface.
+While the previous discussion focused on scalar-valued interpolation targets (i.e., the case $d_2 = 1$), the extension to vector-valued functions is straightforward and works seamlessly, provided that all interpolants in the codomain are constructed using the same multi-index set $\Lambda$.
 
 # Acknowledgements
 
+We thank Thomas O'Leary-Roseberry and Jakob Zech for insightful discussions in the early stages of this project.
 
 # References
