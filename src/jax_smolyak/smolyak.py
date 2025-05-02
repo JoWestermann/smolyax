@@ -1,4 +1,5 @@
 import itertools as it
+from collections import defaultdict
 from typing import Callable, Sequence
 
 import jax
@@ -11,7 +12,6 @@ from . import barycentric, indices, nodes
 jax.config.update("jax_enable_x64", True)
 
 rng_key = jax.random.PRNGKey(0)
-from collections import defaultdict
 
 
 class SmolyakBarycentricInterpolator:
