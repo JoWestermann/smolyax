@@ -6,7 +6,32 @@ from numba import njit
 from numpy.typing import ArrayLike
 
 
-def indexset(k, t: float):
+def indexset(k: ArrayLike, t: float):
+    r"""
+    Generate the `k`-weighted anisotropic multi-index set $\Lambda_{\boldsymbol{k}, t}$ with a given threshold `t`,
+    which is defined as
+    $$
+    \Lambda_{\boldsymbol{k}, t} := \\{\boldsymbol{\nu} \in \mathbb{N}_0^{d_1} \ : \ \sum_{j=1}^{d_1} k_j \nu_j < t\\}.
+    $$
+
+    Parameters
+    ----------
+    k : ArrayLike
+        Weight vector of the anisotropy of the multi-index set.
+    t : float
+        Threshold parameter to control the size of the multi-index set.
+
+    Returns
+    -------
+    list of tuples
+        A list of multi-indices that satisfy the k-weighted condition with threshold `t`. The multi-indices are given in
+        a tuple-based sparse format given as $((j, \nu_j))_{j \in \{0, \dots, d\} : \nu_j > 0}$.
+
+    Notes
+    -----
+    * To find a suitable threshold parameter `t` that allows to construct a `k`-weighted multi-index with a specified
+        cardinality use [`find_approximate_threshold()`](#find_approximate_threshold).
+    """
     stack = [(0, t, ())]
     result = []
 
