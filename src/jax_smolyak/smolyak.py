@@ -11,8 +11,6 @@ from . import barycentric, indices, nodes
 
 jax.config.update("jax_enable_x64", True)
 
-rng_key = jax.random.PRNGKey(0)
-
 
 class SmolyakBarycentricInterpolator:
 
@@ -351,7 +349,7 @@ class SmolyakBarycentricInterpolator:
                 __create_evaluate_tensorproduct_interpolant_for_vmap(n),
                 in_axes=(None, 0) + (0,) * (2 * n) + (0, 0),
             )
-        _ = self(jax.random.uniform(rng_key, (batchsize, self.d_in)))
+        _ = self(jax.random.uniform(jax.random.PRNGKey(0), (batchsize, self.d_in)))
 
     def __call__(self, x: ArrayLike) -> jax.Array:
         """
