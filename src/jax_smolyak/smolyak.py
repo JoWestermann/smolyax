@@ -352,7 +352,7 @@ class SmolyakBarycentricInterpolator:
         _ = self(jax.random.uniform(jax.random.PRNGKey(0), (batchsize, self.d_in)))
 
     def __call__(self, x: ArrayLike) -> jax.Array:
-        """
+        """@public
         Evaluate the Smolyak operator at points `x`.
 
         Parameters
