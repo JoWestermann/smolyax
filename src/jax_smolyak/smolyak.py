@@ -1,4 +1,5 @@
 import itertools as it
+from collections import defaultdict
 from typing import Callable, Sequence
 
 import jax
@@ -50,25 +51,36 @@ class SmolyakBarycentricInterpolator:
         self.d_in = len(k)
         self.d_out = d_out
         self._is_nested = node_gen.is_nested
-
-        indxs_all = indices.indexset(k, t)
-
-        # Step 1 : Sort multiindices and smolyak coefficients by the number of active dimensions, n
-
-        indxs_zeta = []
-        self.n_2_nus = {}
-        self.n_2_zetas = {}
-
-        for nu in indxs_all:
-            zeta = indices.smolyak_coefficient_zeta(k, t, nu=nu)
-            if zeta != 0:
-                indxs_zeta.append(nu)
-                n = len(nu)
-                self.n_2_nus[n] = self.n_2_nus.get(n, []) + [nu]
-                self.n_2_zetas[n] = self.n_2_zetas.get(n, []) + [zeta]
+        self.__node_gen = node_gen
+        # Step 1 : Bin multiindices and smolyak coefficients by the number of active dimensions, n
+        self.__init_indices_data(k, t)
 
         # Step 2 : Compute sorted dimensions and sorted degrees for all multi-indices
+        self.__init_indices_sorting()
 
+        # Step 3 : Allocate and prefill data
+        self.__init_nodes_and_weights()
+
+        # Caching the interpolation node for nu = (0,0,...,0) for reuse in self.set_f
+        self.zero = node_gen.get_zero()
+
+        self.__compiledfuncs = {}
+
+        if f is not None:
+            self.set_f(f=f, batchsize=batchsize)
+
+    def __init_indices_data(self, k: ArrayLike, t: float):
+        self.n_2_nus, self.n_2_zetas = indices.non_zero_indices_and_zetas(k, t)
+
+        # Tracking number of evaluations of the interpolation target f.
+        #   - self.n_f_evals tracks the total number of function evaluations used by the interpolator
+        #   - self.n_f_evals_new counts only new function calls.
+        # If evaluations are reused across interpolator instances, then likely self.n_f_evals_new < self.n_f_evals
+
+        self.n_f_evals = indices.cardinality(k, t, nested=self.is_nested)
+        self.n_f_evals_new = 0
+
+    def __init_indices_sorting(self):
         self.n_2_dims = {}
         self.n_2_sorted_dims = {}
         self.n_2_sorted_degs = {}
@@ -89,49 +101,73 @@ class SmolyakBarycentricInterpolator:
                 self.n_2_sorted_dims[n][i], self.n_2_sorted_degs[n][i] = zip(*sorted_nu)
                 self.n_2_argsort_dims[n][i] = np.argsort(self.n_2_sorted_dims[n][i])
 
-        # Step 3 : Allocate and prefill data
+    def __build_nodes_weights(self, sorted_dims, sorted_degs):
+        """
+        Build lists of per-slot (nn, tau_i+1) arrays of nodes & weights.
 
+        Parameters
+        ----------
+        sorted_dims : np.ndarray[int64] shape (nn, n_dims)
+        sorted_degs : np.ndarray[int64] shape (nn, n_dims)
+
+        Returns
+        -------
+        nodes_list   : list of n_dims arrays, each shape (nn, tau_i+1)
+        weights_list : same shape, filled with barycentric weights
+        """
+        nn, n_dims = sorted_dims.shape
+
+        # compute per-slot max degree tau_i
+        tau = sorted_degs.max(axis=0).astype(int)  # we might want to just keep track of this during construction!
+
+        # pre-allocate output arrays
+        nodes_list = [np.zeros((nn, tau_i + 1), dtype=float) for tau_i in tau]
+        weights_list = [np.zeros((nn, tau_i + 1), dtype=float) for tau_i in tau]
+
+        # for each slot t, group i's by (dim,deg) so we only gen once
+        for t in range(n_dims):
+            groups: dict[tuple[int, int], list[int]] = defaultdict(list)
+            for i in range(nn):
+                dim = int(sorted_dims[i, t])
+                deg = int(sorted_degs[i, t])
+                groups[(dim, deg)].append(i)
+
+            # now for each unique (dim,deg) compute pts & wts once
+            for (dim, deg), idxs in groups.items():
+                pts = self.__node_gen[dim](deg)
+                wts = barycentric.compute_weights(pts)
+                L = len(pts)
+                # Better memory access
+                nodes_list[t][idxs, :L] = pts
+                weights_list[t][idxs, :L] = wts
+            # we can do even better if we vectorize node_gen(degrees) for isotropic rules, like GH or Leja
+        return nodes_list, weights_list
+
+    def __init_nodes_and_weights(self):
         self.offset = 0
         self.n_2_F = {}
         self.n_2_nodes = {}
         self.n_2_weights = {}
-        for n in self.n_2_nus.keys():
 
+        for n, nus in self.n_2_nus.items():
             if n == 0:
+                # Smolyak constant term
                 assert len(self.n_2_zetas[n]) == 1
                 self.offset = self.n_2_zetas[n][0]
                 continue
 
-            nn = len(self.n_2_nus[n])  # number of indices in lambda_n
-            tau = np.max(self.n_2_sorted_degs[n], axis=0)
+            nn = len(nus)  # number of multi-indices of length n
+            # per-slot max degree tau_i
+            sorted_degs = np.array(self.n_2_sorted_degs[n], dtype=int)
+            tau = tuple(int(ti) for ti in sorted_degs.max(axis=0))
 
-            self.n_2_F[n] = np.zeros((nn, d_out) + tuple(tau_i + 1 for tau_i in tau))
-            self.n_2_nodes[n] = [np.zeros((nn, tau_i + 1)) for tau_i in tau]
-            self.n_2_weights[n] = [np.zeros((nn, tau_i + 1)) for tau_i in tau]
+            # allocate the F array
+            self.n_2_F[n] = np.zeros((nn, self.d_out) + tuple(ti + 1 for ti in tau), dtype=float)
 
-            for i, nu in enumerate(self.n_2_nus[n]):
-                for t, (dim, deg) in enumerate(zip(self.n_2_sorted_dims[n][i], self.n_2_sorted_degs[n][i])):
-                    nodes = node_gen[dim](deg)
-                    self.n_2_nodes[n][t][i][: len(nodes)] = nodes
-                    self.n_2_weights[n][t][i][: len(nodes)] = barycentric.compute_weights(nodes)
-
-        # Caching the interpolation node for nu = (0,0,...,0) for reuse in self.set_f
-        self.zero = node_gen.get_zero()
-
-        # Tracking number of evaluations of the interpolation target f.
-        #   - self.n_f_evals tracks the total number of function evaluations used by the interpolator
-        #   - self.n_f_evals_new counts only new function calls.
-        # If evaluations are reused across interpolator instances, then likely self.n_f_evals_new < self.n_f_evals
-        if self.is_nested:
-            self.n_f_evals = len(indxs_all)
-        else:
-            self.n_f_evals = int(np.sum([np.prod([si + 1 for _, si in idx]) for idx in indxs_zeta]))
-        self.n_f_evals_new = 0
-
-        self.__compiledfuncs = {}
-
-        if f is not None:
-            self.set_f(f=f, batchsize=batchsize)
+            # build  nodes & weights via slicing
+            self.n_2_nodes[n], self.n_2_weights[n] = self.__build_nodes_weights(
+                np.array(self.n_2_sorted_dims[n], dtype=int), sorted_degs
+            )
 
     def set_f(
         self,

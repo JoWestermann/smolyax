@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import Tuple
 
 import numpy as np
@@ -105,9 +106,9 @@ def _abs_e_subtree_stack(k, d, rem_t, parity):
 @njit(cache=True)
 def non_nested_cardinality(k, t):
     """
-     For each nu in indexset(k,t):
-       if sum((-1)**e for e in abs_e_list(k,t,nu)) != 0
-         add prod(v+1 for (_,v) in nu)
+    For each nu in indexset(k,t):
+    if sum((-1)**e for e in abs_e_list(k,t,nu)) != 0
+    add prod(v+1 for (_,v) in nu)
     —all in one Nopython pass.
     """
     d = k.shape[0]
@@ -143,6 +144,57 @@ def non_nested_cardinality(k, t):
 
 def smolyak_coefficient_zeta(k, t: float, *, nu: dict[int, int] = None):
     return np.sum([(-1) ** e for e in abs_e(k, t, nu=nu)])
+
+
+@njit(cache=True)
+def _subtree_zeta(k, d, rem_t):
+    total = 0
+    stack = [(0, rem_t, 0)]
+    while stack:
+        i, rt, e = stack.pop()
+        if i >= d:
+            total += 1 - ((e & 1) << 1)
+            continue
+        # skip‐case
+        if i + 1 < d and k[i + 1] < rt:
+            stack.append((i + 1, rt, e))
+        else:
+            total += 1 - ((e & 1) << 1)
+        # include‐case
+        if k[i] < rt:
+            stack.append((i + 1, rt - k[i], e ^ 1))
+    return total
+
+
+def non_zero_indices_and_zetas(k, t):
+    """
+    Constructs the non-zero coefficient indices and their coefficeints in one DFS:
+     – similar to indexset(k,t)
+     – at each 'terminal' nu, calls subtree_sum(rem_t)
+     – if zeta != 0, groups nu by len(nu)
+    """
+    d = len(k)
+    n2nus, n2zetas = defaultdict(list), defaultdict(list)
+
+    stack = [(0, t, ())]
+    while stack:
+        i, rem_t, nu = stack.pop()
+        # terminal skip check
+        if i >= d or not (i + 1 < d and k[i + 1] < rem_t):
+            zeta = _subtree_zeta(k, d, rem_t)
+            if zeta != 0:
+                n = len(nu)
+                n2nus[n].append(nu)
+                n2zetas[n].append(zeta)
+        # expand exactly like indexset
+        if i < d:
+            if i + 1 < d and k[i + 1] < rem_t:
+                stack.append((i + 1, rem_t, nu))
+            j = 1
+            while j * k[i] < rem_t:
+                stack.append((i + 1, rem_t - j * k[i], nu + ((i, j),)))
+                j += 1
+    return n2nus, n2zetas
 
 
 def sparse_index_to_dense(nu: dict[int, int], dim: int) -> tuple:
