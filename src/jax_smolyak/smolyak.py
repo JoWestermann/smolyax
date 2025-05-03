@@ -60,7 +60,7 @@ class SmolyakBarycentricInterpolator:
         self.__init_nodes_and_weights()
 
         # Caching the interpolation node for nu = (0,0,...,0) for reuse in self.set_f
-        self.zero = node_gen.get_zero()
+        self.__zero = node_gen.get_zero()
 
         self.__compiledfuncs = {}
 
@@ -203,7 +203,7 @@ class SmolyakBarycentricInterpolator:
         else:
             f_evals_nu = f_evals.get(nu, {})
         if nu not in f_evals_nu.keys():
-            f_evals_nu[nu] = f(self.zero.copy())
+            f_evals_nu[nu] = f(self.__zero.copy())
             self.n_f_evals_new += 1
         self.offset *= f_evals_nu[nu]
 
@@ -214,7 +214,7 @@ class SmolyakBarycentricInterpolator:
         for n in self.n_2_F.keys():
             nodes = self.n_2_nodes[n]
             for i, nu in enumerate(self.n_2_nus[n]):
-                x = self.zero.copy()
+                x = self.__zero.copy()
 
                 if self.is_nested:
                     f_evals_nu = f_evals
@@ -265,7 +265,7 @@ class SmolyakBarycentricInterpolator:
             return jnp.where(mask_cols[None, :], b, 0)
 
         compute_b = __compute_b_centered
-        if not (self.zero == 0.0).all():
+        if not (self.__zero == 0.0).all():
             compute_b = __compute_b_noncentered
 
         def __evaluate_tensorproduct_interpolant(
