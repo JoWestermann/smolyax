@@ -6,6 +6,21 @@ from numba import njit
 from numpy.typing import ArrayLike
 
 
+def sparse_index_to_dense(nu: dict[int, int], dim: int) -> tuple:
+    dense_nu = [0] * dim
+    for k, v in nu:
+        dense_nu[k] = v
+    return tuple(dense_nu)
+
+
+def dense_index_to_sparse(dense_nu: ArrayLike) -> Tuple[Tuple[int, int], ...]:
+    sparse_nu = []
+    for k, v in enumerate(dense_nu):
+        if v > 0:
+            sparse_nu.append((k, v))
+    return tuple(sparse_nu)
+
+
 def indexset(k, t: float):
     d = len(k)
     stack = [(0, t, ())]  # dimension, threshold, multi-index head (entries in the first dimensions)
@@ -62,6 +77,7 @@ def indexset_size(k, t):
     return count
 
 
+# deprecated
 def abs_e(k, t, i=0, e=None, *, nu: dict[int, int] = None):
     if e is None:
         assert i == 0 and nu is not None
@@ -77,6 +93,11 @@ def abs_e(k, t, i=0, e=None, *, nu: dict[int, int] = None):
     if k[i] < t:
         r += abs_e(k, t - k[i], i + 1, e + 1)
     return r
+
+
+# deprecated
+def smolyak_coefficient_zeta(k, t: float, *, nu: dict[int, int] = None):
+    return np.sum([(-1) ** e for e in abs_e(k, t, nu=nu)])
 
 
 @njit(cache=True)
@@ -144,10 +165,6 @@ def non_nested_cardinality(k, t):
     return total
 
 
-def smolyak_coefficient_zeta(k, t: float, *, nu: dict[int, int] = None):
-    return np.sum([(-1) ** e for e in abs_e(k, t, nu=nu)])
-
-
 @njit(cache=True)
 def _subtree_zeta(k, d, rem_t):
     stack = [(0, rem_t, 0)]  # dimension, threshold, zeta
@@ -203,21 +220,6 @@ def non_zero_indices_and_zetas(k, t):
             stack.append((i + 1, rem_t - j * k_i, nu + ((i, j),)))
             j += 1
     return n2nus, n2zetas
-
-
-def sparse_index_to_dense(nu: dict[int, int], dim: int) -> tuple:
-    dense_nu = [0] * dim
-    for k, v in nu:
-        dense_nu[k] = v
-    return tuple(dense_nu)
-
-
-def dense_index_to_sparse(dense_nu: ArrayLike) -> Tuple[Tuple[int, int], ...]:
-    sparse_nu = []
-    for k, v in enumerate(dense_nu):
-        if v > 0:
-            sparse_nu.append((k, v))
-    return tuple(sparse_nu)
 
 
 def cardinality(k, t: float, nested: bool = False) -> int:
