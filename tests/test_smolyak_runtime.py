@@ -35,7 +35,7 @@ def setup_nodes(d, nested, centered):
         (10000, 10000, False, False),
     ],
 )
-def d_test_smolyak_constructor_runtime(benchmark, d, m, nested, centered):
+def test_smolyak_constructor_runtime(benchmark, d, m, nested, centered):
     node_gen = setup_nodes(d, nested, centered)
     k = np.log([2 + i for i in range(d)]) / np.log(2)
     t = indices.find_approximate_threshold(k, m, nested)
