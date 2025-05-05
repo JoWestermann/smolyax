@@ -65,3 +65,26 @@ def test_smolyak_set_f_runtime(benchmark, d, m, nested, centered):
     t = indices.find_approximate_threshold(k, m, nested)
     f = lambda x: target_f(x, 2.0, 2.0)
     benchmark(lambda: smolyak.SmolyakBarycentricInterpolator(node_gen=node_gen, k=k, t=t, d_out=1, f=f))
+
+
+@pytest.mark.parametrize(
+    "d, m, nested, centered",
+    [
+        (100, 1000, True, True),
+        (100, 1000, True, False),
+        (100, 1000, False, True),
+        (100, 1000, False, False),
+        (10000, 10000, True, True),
+        (10000, 10000, True, False),
+        (10000, 10000, False, True),
+        (10000, 10000, False, False),
+    ],
+)
+def test_smolyak_eval(benchmark, d, m, nested, centered):
+    node_gen = setup_nodes(d, nested, centered)
+    k = np.log([2 + i for i in range(d)]) / np.log(2)
+    t = indices.find_approximate_threshold(k, m, nested)
+    f = lambda x: target_f(x, 2.0, 2.0)
+    smol = smolyak.SmolyakBarycentricInterpolator(node_gen=node_gen, k=k, t=t, d_out=1, f=f)
+    x = np.random.randn(250, 1)
+    benchmark(lambda: smol(x))
