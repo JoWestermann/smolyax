@@ -23,7 +23,7 @@ def setup_nodes(d: int, node_type: str, default_domain: bool) -> nodes.Generator
     nodes.Generator
         An instance of the specified node type with the configured domain.
     """
-    if node_type == 'leja':
+    if node_type == "leja":
         if default_domain:
             return nodes.Leja(dim=d)
         else:
@@ -31,7 +31,7 @@ def setup_nodes(d: int, node_type: str, default_domain: bool) -> nodes.Generator
             domain[:, 1] = np.sort(np.random.rand(d) * 10)
             domain[:, 0] = -domain[:, 1]
             return nodes.Leja(domains=domain)
-    elif node_type == 'gauss':
+    elif node_type == "gauss":
         if default_domain:
             return nodes.GaussHermite(dim=d)
         else:
@@ -45,14 +45,14 @@ def setup_nodes(d: int, node_type: str, default_domain: bool) -> nodes.Generator
 @pytest.mark.parametrize(
     "d, m, node_type, default_domain",
     [
-        (100, 1000, 'leja', True),
-        (100, 1000, 'leja', False),
-        (100, 1000, 'gauss', True),
-        (100, 1000, 'gauss', False),
-        (10000, 10000, 'leja', True),
-        (10000, 10000, 'leja', False),
-        (10000, 10000, 'gauss', True),
-        (10000, 10000, 'gauss', False),
+        (100, 1000, "leja", True),
+        (100, 1000, "leja", False),
+        (100, 1000, "gauss", True),
+        (100, 1000, "gauss", False),
+        (10000, 10000, "leja", True),
+        (10000, 10000, "leja", False),
+        (10000, 10000, "gauss", True),
+        (10000, 10000, "gauss", False),
     ],
 )
 def test_smolyak_constructor_runtime(benchmark, d, m, node_type, default_domain):
@@ -69,14 +69,14 @@ def target_f(x, theta, r):
 @pytest.mark.parametrize(
     "d, m, node_type, default_domain",
     [
-        (100, 1000, 'leja', True),
-        (100, 1000, 'leja', False),
-        (100, 1000, 'gauss', True),
-        (100, 1000, 'gauss', False),
-        (10000, 10000, 'leja', True),
-        (10000, 10000, 'leja', False),
-        (10000, 10000, 'gauss', True),
-        (10000, 10000, 'gauss', False),
+        (100, 1000, "leja", True),
+        (100, 1000, "leja", False),
+        (100, 1000, "gauss", True),
+        (100, 1000, "gauss", False),
+        (10000, 10000, "leja", True),
+        (10000, 10000, "leja", False),
+        (10000, 10000, "gauss", True),
+        (10000, 10000, "gauss", False),
     ],
 )
 def test_smolyak_set_f_runtime(benchmark, d, m, node_type, default_domain):
@@ -90,14 +90,14 @@ def test_smolyak_set_f_runtime(benchmark, d, m, node_type, default_domain):
 @pytest.mark.parametrize(
     "d, m, node_type, default_domain",
     [
-        (100, 1000, 'leja', True),
-        (100, 1000, 'leja', False),
-        (100, 1000, 'gauss', True),
-        (100, 1000, 'gauss', False),
-        (10000, 10000, 'leja', True),
-        (10000, 10000, 'leja', False),
-        (10000, 10000, 'gauss', True),
-        (10000, 10000, 'gauss', False),
+        (100, 1000, "leja", True),
+        (100, 1000, "leja", False),
+        (100, 1000, "gauss", True),
+        (100, 1000, "gauss", False),
+        (10000, 10000, "leja", True),
+        (10000, 10000, "leja", False),
+        (10000, 10000, "gauss", True),
+        (10000, 10000, "gauss", False),
     ],
 )
 def test_smolyak_eval(benchmark, d, m, node_type, default_domain):
