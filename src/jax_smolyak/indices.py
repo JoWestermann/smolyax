@@ -7,27 +7,28 @@ from numpy.typing import ArrayLike
 
 
 def indexset(k, t: float):
-    stack = [(0, t, ())]
+    d = len(k)
+    stack = [(0, t, ())]  # dimension, threshold, multi-index head (entries in the first dimensions)
     result = []
 
     while stack:
-        dim_i, remaining_t, nu_head = stack.pop()
+        i, remaining_t, nu_head = stack.pop()
 
-        # Check if the index nu_head is final
-
-        if dim_i >= len(k) or k[dim_i] >= remaining_t:
+        # Check if the stack entry is final
+        if i >= d or k[i] >= remaining_t:
             result.append(nu_head)
             continue
 
-        # Otherwise add all possible extensions of nu_head onto the stack
+        # Add nu_head with nu_i = 0 on to the stack
+        stack.append((i + 1, remaining_t, nu_head))
 
-        stack.append((dim_i + 1, remaining_t, nu_head))
-
+        # Add all admissible nu_head with nu_i = j on to the stack
         j = 1
-        while j * k[dim_i] < remaining_t:
-            nu_extended = nu_head + ((dim_i, j),)
-            new_t = remaining_t - j * k[dim_i]
-            stack.append((dim_i + 1, new_t, nu_extended))
+        k_i = k[i]
+        while j * k_i < remaining_t:
+            nu_extended = nu_head + ((i, j),)
+            new_t = remaining_t - j * k_i
+            stack.append((i + 1, new_t, nu_extended))
             j += 1
 
     return result
@@ -35,27 +36,27 @@ def indexset(k, t: float):
 
 @njit(cache=True)
 def indexset_size(k, t):
-    stack = [(0, 0.0)]
+    d = len(k)
+    stack = [(0, t)]  # dimension, threshold
     count = 0
 
     while stack:
-        dim_i, used_t = stack.pop()
+        i, remaining_t = stack.pop()
 
-        if dim_i >= len(k):
+        # Check if the stack entry is final
+        if i >= d or k[i] >= remaining_t:
             count += 1
             continue
 
-        remaining_t = t - used_t
+        # Add case nu_i = 0 on to the stack
+        stack.append((i + 1, remaining_t))
 
-        if dim_i + 1 < len(k) and k[dim_i + 1] < remaining_t:
-            stack.append((dim_i + 1, used_t))
-        else:
-            count += 1
-
+        # Add all admissible cases with nu_i = j on to the stack
         j = 1
-        while used_t + j * k[dim_i] < t:
-            new_used_t = used_t + j * k[dim_i]
-            stack.append((dim_i + 1, new_used_t))
+        k_i = k[i]
+        while j * k_i < remaining_t:
+            new_t = remaining_t - j * k_i
+            stack.append((i + 1, new_t))
             j += 1
 
     return count
@@ -85,21 +86,23 @@ def _abs_e_subtree_stack(k, d, rem_t, parity):
     always recurse from i=0 over all dimensions.
     """
     total = 0
-    stack = [(0, rem_t, parity)]
+    stack = [(0, rem_t, parity)]  # dimension, threshold, parity
+
     while stack:
         i, rt, p = stack.pop()
-        if i >= d:
+
+        # Check if the stack entry is final
+        if i >= d or k[i + 1] >= rt:
             total += 1 - (p << 1)
             continue
-        # skip‐case
-        if i + 1 < d and k[i + 1] < rt:
-            stack.append((i + 1, rt, p))
-        else:
-            total += 1 - (p << 1)
-        # include‐case (one copy)
-        cost = k[i]
-        if cost < rt:
-            stack.append((i + 1, rt - cost, p ^ 1))
+
+        # Add case e_i = 0 on to the stack
+        stack.append((i + 1, rt, p))
+
+        # Add case e_i = 1 on to the stack if admissible
+        k_i = k[i]
+        if k_i < rt:
+            stack.append((i + 1, rt - k_i, p ^ 1))
     return total
 
 
@@ -111,33 +114,32 @@ def non_nested_cardinality(k, t):
     add prod(v+1 for (_,v) in nu)
     —all in one Nopython pass.
     """
-    d = k.shape[0]
+    d = len(k)
+    stack = [(0, t, 0, 1)]  # dimension, threshold, parity, prod_n
     total = 0
-    # main stack holds (dim_i, rem_budget, parity, prod_n)
-    stack = [(0, t, 0, 1)]
+
     while stack:
-        dim_i, rem_t, parity, prod_n = stack.pop()
+        i, rem_t, parity, prod_n = stack.pop()
 
-        # terminal skip‐branch?
-        if dim_i >= d or not (dim_i + 1 < d and k[dim_i + 1] < rem_t):
-            s = _abs_e_subtree_stack(k, d, rem_t, parity)
-            if s != 0:
+        # Check if the stack entry is final
+        if i >= len(k) or k[i] >= rem_t:
+            zeta = _abs_e_subtree_stack(k, d, rem_t, parity)
+            if zeta != 0:
                 total += prod_n
+            continue
 
-        # now expand exactly like your original indexset
-        if dim_i < d:
-            # skip‐branch
-            if dim_i + 1 < d and k[dim_i + 1] < rem_t:
-                stack.append((dim_i + 1, rem_t, parity, prod_n))
-            # include‐branches for all j≥1
-            cost = k[dim_i]
-            j = 1
-            while cost * j < rem_t:
-                new_parity = parity ^ (j & 1)
-                new_prod_n = prod_n * (j + 1)
-                new_rem_t = rem_t - cost * j
-                stack.append((dim_i + 1, new_rem_t, new_parity, new_prod_n))
-                j += 1
+        # Add case nu_i = 0 on to the stack
+        stack.append((i + 1, rem_t, parity, prod_n))
+
+        # Add all admissible cases with nu_i = j on to the stack
+        j = 1
+        k_i = k[i]
+        while j * k_i < rem_t:
+            new_parity = parity ^ (j & 1)
+            new_prod_n = prod_n * (j + 1)
+            new_rem_t = rem_t - j * k_i
+            stack.append((i + 1, new_rem_t, new_parity, new_prod_n))
+            j += 1
 
     return total
 
@@ -148,19 +150,21 @@ def smolyak_coefficient_zeta(k, t: float, *, nu: dict[int, int] = None):
 
 @njit(cache=True)
 def _subtree_zeta(k, d, rem_t):
+    stack = [(0, rem_t, 0)]  # dimension, threshold, zeta
     total = 0
-    stack = [(0, rem_t, 0)]
+
     while stack:
         i, rt, e = stack.pop()
-        if i >= d:
+
+        # Check if the stack entry is final
+        if i >= d or k[i] >= rt:
             total += 1 - ((e & 1) << 1)
             continue
-        # skip‐case
-        if i + 1 < d and k[i + 1] < rt:
-            stack.append((i + 1, rt, e))
-        else:
-            total += 1 - ((e & 1) << 1)
-        # include‐case
+
+        # Add case e_i = 0 on to the stack
+        stack.append((i + 1, rt, e))
+
+        # Add case e_i = 1 on to the stack if admissible
         if k[i] < rt:
             stack.append((i + 1, rt - k[i], e ^ 1))
     return total
@@ -179,21 +183,25 @@ def non_zero_indices_and_zetas(k, t):
     stack = [(0, t, ())]
     while stack:
         i, rem_t, nu = stack.pop()
-        # terminal skip check
-        if i >= d or not (i + 1 < d and k[i + 1] < rem_t):
+
+        # Check if the stack entry is final
+        if i >= d or k[i] >= rem_t:
             zeta = _subtree_zeta(k, d, rem_t)
             if zeta != 0:
                 n = len(nu)
                 n2nus[n].append(nu)
                 n2zetas[n].append(zeta)
-        # expand exactly like indexset
-        if i < d:
-            if i + 1 < d and k[i + 1] < rem_t:
-                stack.append((i + 1, rem_t, nu))
-            j = 1
-            while j * k[i] < rem_t:
-                stack.append((i + 1, rem_t - j * k[i], nu + ((i, j),)))
-                j += 1
+            continue
+
+        # Add case nu_i = 0 on to the stack
+        stack.append((i + 1, rem_t, nu))
+
+        # Add all admissible nu_head with nu_i = j on to the stack
+        j = 1
+        k_i = k[i]
+        while j * k_i < rem_t:
+            stack.append((i + 1, rem_t - j * k_i, nu + ((i, j),)))
+            j += 1
     return n2nus, n2zetas
 
 
