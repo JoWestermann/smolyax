@@ -41,7 +41,9 @@ class SmolyakBarycentricInterpolator:
         d_out : int
             Output dimension of the target function.
         f : Callable[[Union[jax.Array, np.ndarray]], Union[jax.Array, np.ndarray]], optional
-            Target function to interpolate.
+            Target function to interpolate. While `f` can be passed at construction time, for a better control over, and
+            potential reuse of, function evaluations consider calling [`set_f()`](#SmolyakBarycentricInterpolator.set_f)
+            *after* construction.
         batchsize : int, default=250
             Anticipated batch size of the interpolator input, used for pre-compiling the `__call__` method.
         """
