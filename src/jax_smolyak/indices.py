@@ -1,12 +1,11 @@
 from collections import defaultdict
-from typing import Tuple
+from typing import Sequence, Tuple
 
 import numpy as np
 from numba import njit
-from numpy.typing import ArrayLike
 
 
-def indexset(k: ArrayLike, t: float):
+def indexset(k: Sequence[float], t: float):
     r"""
     Generate the `k`-weighted anisotropic multi-index set $\Lambda_{\boldsymbol{k}, t}$ with a given threshold `t`,
     which is defined as
@@ -16,7 +15,7 @@ def indexset(k: ArrayLike, t: float):
 
     Parameters
     ----------
-    k : ArrayLike
+    k : Sequence[float]
         Weight vector of the anisotropy of the multi-index set.
     t : float
         Threshold parameter to control the size of the multi-index set.
@@ -243,14 +242,16 @@ def cardinality(k, t: float, nested: bool = False) -> int:
     return non_nested_cardinality(k, t)
 
 
-def find_approximate_threshold(k: ArrayLike, m: int, nested: bool, max_iter: int = 32, accuracy: float = 0.001) -> int:
+def find_approximate_threshold(
+    k: Sequence[float], m: int, nested: bool, max_iter: int = 32, accuracy: float = 0.001
+) -> int:
     """
     Find the approximate threshold parameter to construct a k-weighted multi-index set such that the set of
     corresponding interpolation nodes has a cardinality of approximately `m`.
 
     Parameters
     ----------
-    k : ArrayLike
+    k : Sequence[float]
         Weight vector of the anisotropy of the multi-index set.
     m : int
         Target cardinality of the set of interpolation nodes.
