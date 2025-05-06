@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Sequence, Tuple
+from typing import Sequence
 
 import numpy as np
 from numba import njit
@@ -221,14 +221,14 @@ def non_zero_indices_and_zetas(k, t):
     return n2nus, n2zetas
 
 
-def sparse_index_to_dense(nu: dict[int, int], dim: int) -> tuple:
+def sparse_index_to_dense(nu: tuple[tuple[int, int], ...], dim: int) -> tuple:
     dense_nu = [0] * dim
     for k, v in nu:
         dense_nu[k] = v
     return tuple(dense_nu)
 
 
-def dense_index_to_sparse(dense_nu: ArrayLike) -> Tuple[Tuple[int, int], ...]:
+def dense_index_to_sparse(dense_nu: tuple[int]) -> tuple[tuple[int, int], ...]:
     sparse_nu = []
     for k, v in enumerate(dense_nu):
         if v > 0:
@@ -244,7 +244,7 @@ def cardinality(k, t: float, nested: bool = False) -> int:
 
 def find_approximate_threshold(
     k: Sequence[float], m: int, nested: bool, max_iter: int = 32, accuracy: float = 0.001
-) -> int:
+) -> float:
     """
     Find the approximate threshold parameter to construct a k-weighted multi-index set such that the set of
     corresponding interpolation nodes has a cardinality of approximately `m`.
@@ -266,7 +266,7 @@ def find_approximate_threshold(
 
     Returns
     -------
-    int
+    float
         Threshold parameter `t` to construct a k-weighted multi-index set of size approximately `m`.
 
     Notes
