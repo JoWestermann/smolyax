@@ -1,17 +1,14 @@
 import itertools as it
 from collections import defaultdict
-from typing import Callable, Sequence
+from typing import Callable, Sequence, Union
 
 import jax
 import jax.numpy as jnp
 import numpy as np
-from jax.typing import ArrayLike
 
 from . import barycentric, indices, nodes
 
 jax.config.update("jax_enable_x64", True)
-
-rng_key = jax.random.PRNGKey(0)
 
 
 class SmolyakBarycentricInterpolator:
@@ -24,10 +21,10 @@ class SmolyakBarycentricInterpolator:
         self,
         *,
         node_gen: nodes.Generator,
-        k: ArrayLike,
+        k: Union[jax.Array, np.ndarray],
         t: float,
         d_out: int,
-        f: Callable[[ArrayLike], jax.Array] = None,
+        f: Callable[[Union[jax.Array, np.ndarray]], Union[jax.Array, np.ndarray]] = None,
         batchsize: int = 250,
     ) -> None:
         """
@@ -37,14 +34,16 @@ class SmolyakBarycentricInterpolator:
         ----------
         node_gen : nodes.Generator
             Generator object that returns interpolation nodes for each dimension.
-        k : ArrayLike
+        k : Union[jax.Array, np.ndarray]
             Anisotropy weight vector of the multi-index set. Shape `(d_in,)`.
         t : float
             Threshold that controls the size of the multi-index set.
         d_out : int
             Output dimension of the target function.
-        f : Callable[[ArrayLike], jax.Array], optional
-            Target function to interpolate.
+        f : Callable[[Union[jax.Array, np.ndarray]], Union[jax.Array, np.ndarray]], optional
+            Target function to interpolate. While `f` can be passed at construction time, for a better control over, and
+            potential reuse of, function evaluations consider calling [`set_f()`](#SmolyakBarycentricInterpolator.set_f)
+            *after* construction.
         batchsize : int, default=250
             Anticipated batch size of the interpolator input, used for pre-compiling the `__call__` method.
         """
@@ -52,6 +51,7 @@ class SmolyakBarycentricInterpolator:
         self.d_out = d_out
         self._is_nested = node_gen.is_nested
         self.__node_gen = node_gen
+
         # Step 1 : Bin multiindices and smolyak coefficients by the number of active dimensions, n
         self.__init_indices_data(k, t)
 
@@ -62,14 +62,14 @@ class SmolyakBarycentricInterpolator:
         self.__init_nodes_and_weights()
 
         # Caching the interpolation node for nu = (0,0,...,0) for reuse in self.set_f
-        self.zero = node_gen.get_zero()
+        self.__zero = node_gen.get_zero()
 
         self.__compiledfuncs = {}
 
         if f is not None:
             self.set_f(f=f, batchsize=batchsize)
 
-    def __init_indices_data(self, k: ArrayLike, t: float):
+    def __init_indices_data(self, k: Union[jax.Array, np.ndarray], t: float):
         self.n_2_nus, self.n_2_zetas = indices.non_zero_indices_and_zetas(k, t)
 
         # Tracking number of evaluations of the interpolation target f.
@@ -172,7 +172,7 @@ class SmolyakBarycentricInterpolator:
     def set_f(
         self,
         *,
-        f: Callable[[ArrayLike], jax.Array],
+        f: Callable[[Union[jax.Array, np.ndarray]], Union[jax.Array, np.ndarray]],
         f_evals: dict[tuple, dict[tuple, jax.Array]] = None,
         batchsize: int = 250,
     ) -> dict[tuple, dict[tuple, jax.Array]]:
@@ -182,7 +182,7 @@ class SmolyakBarycentricInterpolator:
 
         Parameters
         ----------
-        f : Callable[[ArrayLike], jax.Array]
+        f : Callable[[Union[jax.Array, np.ndarray]], Union[jax.Array, np.ndarray]]
             Target function to interpolate.
         f_evals : dict, optional
             A dictionary mapping interpolation nodes to function evaluations.
@@ -205,7 +205,7 @@ class SmolyakBarycentricInterpolator:
         else:
             f_evals_nu = f_evals.get(nu, {})
         if nu not in f_evals_nu.keys():
-            f_evals_nu[nu] = f(self.zero.copy())
+            f_evals_nu[nu] = f(self.__zero.copy())
             self.n_f_evals_new += 1
         self.offset *= f_evals_nu[nu]
 
@@ -216,7 +216,7 @@ class SmolyakBarycentricInterpolator:
         for n in self.n_2_F.keys():
             nodes = self.n_2_nodes[n]
             for i, nu in enumerate(self.n_2_nus[n]):
-                x = self.zero.copy()
+                x = self.__zero.copy()
 
                 if self.is_nested:
                     f_evals_nu = f_evals
@@ -267,7 +267,7 @@ class SmolyakBarycentricInterpolator:
             return jnp.where(mask_cols[None, :], b, 0)
 
         compute_b = __compute_b_centered
-        if not (self.zero == 0.0).all():
+        if not (self.__zero == 0.0).all():
             compute_b = __compute_b_noncentered
 
         def __evaluate_tensorproduct_interpolant(
@@ -351,22 +351,22 @@ class SmolyakBarycentricInterpolator:
                 __create_evaluate_tensorproduct_interpolant_for_vmap(n),
                 in_axes=(None, 0) + (0,) * (2 * n) + (0, 0),
             )
-        _ = self(jax.random.uniform(rng_key, (batchsize, self.d_in)))
+        _ = self(jax.random.uniform(jax.random.PRNGKey(0), (batchsize, self.d_in)))
 
-    def __call__(self, x: ArrayLike) -> jax.Array:
-        """
+    def __call__(self, x: Union[jax.Array, np.ndarray]) -> jax.Array:
+        """@public
         Evaluate the Smolyak operator at points `x`.
 
         Parameters
         ----------
-        x : ArrayLike
+        x : Union[jax.Array, np.ndarray]
             Points at which to evaluate the Smolyak interpolant of the target function `f`.
             Shape: `(n_points, d_in)` or `(d_in,)`, where `n_points` is the number of evaluation points
             and `d_in` is the dimension of the input domain.
 
         Returns
         -------
-        ArrayLike
+        jax.Array
             The interpolant of the target function `f` evaluated at points `x`. Shape: `(n_points, d_out)`
         """
         assert bool(self.__compiledfuncs) == bool(

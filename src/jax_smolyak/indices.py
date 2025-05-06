@@ -1,19 +1,18 @@
 from collections import defaultdict
-from typing import Tuple
+from typing import Sequence
 
 import numpy as np
 from numba import njit
-from numpy.typing import ArrayLike
 
 
-def sparse_index_to_dense(nu: dict[int, int], dim: int) -> tuple:
+def sparse_index_to_dense(nu: tuple[tuple[int, int], ...], dim: int) -> tuple:
     dense_nu = [0] * dim
     for k, v in nu:
         dense_nu[k] = v
     return tuple(dense_nu)
 
 
-def dense_index_to_sparse(dense_nu: ArrayLike) -> Tuple[Tuple[int, int], ...]:
+def dense_index_to_sparse(dense_nu: tuple[int]) -> tuple[tuple[int, int], ...]:
     sparse_nu = []
     for k, v in enumerate(dense_nu):
         if v > 0:
@@ -21,7 +20,32 @@ def dense_index_to_sparse(dense_nu: ArrayLike) -> Tuple[Tuple[int, int], ...]:
     return tuple(sparse_nu)
 
 
-def indexset(k, t: float):
+def indexset(k: Sequence[float], t: float):
+    r"""
+    Generate the `k`-weighted anisotropic multi-index set $\Lambda_{\boldsymbol{k}, t}$ with a given threshold `t`,
+    which is defined as
+    $$
+    \Lambda_{\boldsymbol{k}, t} := \\{\boldsymbol{\nu} \in \mathbb{N}_0^{d_1} \ : \ \sum_{j=1}^{d_1} k_j \nu_j < t\\}.
+    $$
+
+    Parameters
+    ----------
+    k : Sequence[float]
+        Weight vector of the anisotropy of the multi-index set.
+    t : float
+        Threshold parameter to control the size of the multi-index set.
+
+    Returns
+    -------
+    list of tuples
+        A list of multi-indices that satisfy the k-weighted condition with threshold `t`. The multi-indices are given in
+        a tuple-based sparse format given as $((j, \nu_j))_{j \in \{0, \dots, d\} : \nu_j > 0}$.
+
+    Notes
+    -----
+    * To find a suitable threshold parameter `t` that allows to construct a `k`-weighted multi-index with a specified
+        cardinality use [`find_approximate_threshold()`](#find_approximate_threshold).
+    """
     d = len(k)
     stack = [(0, t, ())]  # dimension, threshold, multi-index head (entries in the first dimensions)
     result = []
@@ -228,14 +252,16 @@ def cardinality(k, t: float, nested: bool = False) -> int:
     return non_nested_cardinality(k, t)
 
 
-def find_approximate_threshold(k: ArrayLike, m: int, nested: bool, max_iter: int = 32, accuracy: float = 0.001) -> int:
+def find_approximate_threshold(
+    k: Sequence[float], m: int, nested: bool, max_iter: int = 32, accuracy: float = 0.001
+) -> float:
     """
     Find the approximate threshold parameter to construct a k-weighted multi-index set such that the set of
     corresponding interpolation nodes has a cardinality of approximately `m`.
 
     Parameters
     ----------
-    k : ArrayLike
+    k : Sequence[float]
         Weight vector of the anisotropy of the multi-index set.
     m : int
         Target cardinality of the set of interpolation nodes.
@@ -250,7 +276,7 @@ def find_approximate_threshold(k: ArrayLike, m: int, nested: bool, max_iter: int
 
     Returns
     -------
-    int
+    float
         Threshold parameter `t` to construct a k-weighted multi-index set of size approximately `m`.
 
     Notes
