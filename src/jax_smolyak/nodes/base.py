@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Iterator, List, Self
+from typing import Iterator, List, Self, Union
 
+import jax
 import numpy as np
-from numpy.typing import ArrayLike
 
 
 class Generator(ABC):
@@ -21,7 +21,7 @@ class Generator(ABC):
         return self._dim
 
     @abstractmethod
-    def __call__(self, n: int) -> ArrayLike: ...
+    def __call__(self, n: int) -> Union[jax.Array, np.ndarray]: ...
 
     def __getitem__(self, i: int):
         assert i == 0
@@ -32,15 +32,15 @@ class Generator(ABC):
             yield self[index]
 
     @abstractmethod
-    def scale(self, x: ArrayLike) -> ArrayLike: ...
+    def scale(self, x: Union[jax.Array, np.ndarray]) -> Union[jax.Array, np.ndarray]: ...
 
     @abstractmethod
-    def scale_back(self, x: ArrayLike) -> ArrayLike: ...
+    def scale_back(self, x: Union[jax.Array, np.ndarray]) -> Union[jax.Array, np.ndarray]: ...
 
     @abstractmethod
-    def get_random(self, n: int = 1) -> ArrayLike: ...
+    def get_random(self, n: int = 1) -> Union[jax.Array, np.ndarray]: ...
 
-    def get_zero(self) -> ArrayLike:
+    def get_zero(self) -> Union[jax.Array, np.ndarray]:
         return self(0)[0]
 
     @abstractmethod
@@ -55,28 +55,28 @@ class GeneratorMultiD(Generator):
         super().__init__(dim=len(node_gens), is_nested=node_gens[0].is_nested)
         self.gens = node_gens
 
-    def __call__(self, n: int) -> ArrayLike:
+    def __call__(self, n: int) -> Union[jax.Array, np.ndarray]:
         raise
 
     def __getitem__(self, i: int) -> Generator:
         return self.gens[i]
 
-    def get_zero(self) -> ArrayLike:
+    def get_zero(self) -> Union[jax.Array, np.ndarray]:
         return np.array([g(0)[0] for g in self.gens])
 
-    def get_random(self, n: int = 0) -> ArrayLike:
+    def get_random(self, n: int = 0) -> Union[jax.Array, np.ndarray]:
         if n == 0:
             return np.squeeze([g.get_random() for g in self.gens])
         return np.array([g.get_random(n) for g in self.gens]).T
 
-    def scale(self, x: ArrayLike) -> ArrayLike:
+    def scale(self, x: Union[jax.Array, np.ndarray]) -> Union[jax.Array, np.ndarray]:
         assert x.shape[-1] == self.dim
         if x.ndim == 1:
             return np.array([g.scale(xi) for g, xi in zip(self.gens, x)])
         else:
             return np.array([g.scale(xi) for g, xi in zip(self.gens, x.T)]).T
 
-    def scale_back(self, x: ArrayLike) -> ArrayLike:
+    def scale_back(self, x: Union[jax.Array, np.ndarray]) -> Union[jax.Array, np.ndarray]:
         assert x.shape[-1] == self.dim
         if x.ndim == 1:
             return np.array([g.scale_back(xi) for g, xi in zip(self.gens, x)])

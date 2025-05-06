@@ -1,7 +1,8 @@
 from functools import lru_cache
+from typing import Sequence, Union
 
+import jax
 import numpy as np
-from numpy.typing import ArrayLike
 
 from .base import Generator, GeneratorMultiD
 
@@ -11,7 +12,7 @@ class Leja1D(Generator):
 
     nodes = np.array([0, 1, -1, 1 / np.sqrt(2), -1 / np.sqrt(2)])
 
-    def __init__(self, domain: ArrayLike = None) -> None:
+    def __init__(self, domain: Union[jax.Array, np.ndarray, Sequence[float]] = None) -> None:
         super().__init__(dim=1, is_nested=True)
         self.domain = domain
         self._reference_domain = None
@@ -42,10 +43,15 @@ class Leja1D(Generator):
 
         return cached
 
-    def __call__(self, n: int) -> ArrayLike:
+    def __call__(self, n: int) -> Union[jax.Array, np.ndarray]:
         return self.__cached_scaled_call(n)
 
-    def scale(self, x: ArrayLike, d1: ArrayLike = None, d2: ArrayLike = None) -> ArrayLike:
+    def scale(
+        self,
+        x: Union[jax.Array, np.ndarray],
+        d1: Union[jax.Array, np.ndarray, Sequence[float]] = None,
+        d2: Union[jax.Array, np.ndarray, Sequence[float]] = None,
+    ) -> Union[jax.Array, np.ndarray]:
         """
         Affine transformation from the interval d1 to the interval d2 applied to point x.
         x : scalar or array or list of shape (n, )
@@ -84,7 +90,7 @@ class Leja1D(Generator):
         # Return in original shape
         return x.reshape(x_shape)
 
-    def scale_back(self, x: ArrayLike) -> ArrayLike:
+    def scale_back(self, x: Union[jax.Array, np.ndarray]) -> Union[jax.Array, np.ndarray]:
         return self.scale(x, d1=self.domain, d2=self._reference_domain)
 
     def get_random(self, n: int = 1):
@@ -93,7 +99,12 @@ class Leja1D(Generator):
 
 class Leja(GeneratorMultiD):
 
-    def __init__(self, *, domains: ArrayLike = None, dim: int = None):
+    def __init__(
+        self,
+        *,
+        domains: list[Union[jax.Array, np.ndarray, Sequence[float]]] = None,
+        dim: int = None,
+    ):
         self.domains = None
         self._reference_domains = None
         if domains is not None:
@@ -111,10 +122,15 @@ class Leja(GeneratorMultiD):
         else:
             return f"Leja (d = {self.dim})"
 
-    def scale_back(self, x: ArrayLike) -> ArrayLike:
+    def scale_back(self, x: Union[jax.Array, np.ndarray]) -> Union[jax.Array, np.ndarray]:
         return self.scale(x, d1=self.domains, d2=self._reference_domains)
 
-    def scale(self, x: ArrayLike, d1: ArrayLike = None, d2: ArrayLike = None) -> ArrayLike:
+    def scale(
+        self,
+        x: Union[jax.Array, np.ndarray],
+        d1: Union[jax.Array, np.ndarray, Sequence[float]] = None,
+        d2: Union[jax.Array, np.ndarray, Sequence[float]] = None,
+    ) -> Union[jax.Array, np.ndarray]:
         """
         Affine transformation from the interval d1 to the interval d2 applied to point x.
         x : array or list of shape (n, d) or (d, )
