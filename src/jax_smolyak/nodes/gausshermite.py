@@ -1,7 +1,8 @@
 from functools import lru_cache
+from typing import Union
 
+import jax
 import numpy as np
-from numpy.typing import ArrayLike
 
 from .base import Generator, GeneratorMultiD
 
@@ -25,22 +26,24 @@ class GaussHermite1D(Generator):
 
         return cached
 
-    def __call__(self, n: int) -> ArrayLike:
+    def __call__(self, n: int) -> Union[jax.Array, np.ndarray]:
         return self.__cached_scaled_gh_n_plus_1(n)
 
-    def scale(self, x: ArrayLike) -> ArrayLike:
+    def scale(self, x: Union[jax.Array, np.ndarray]) -> Union[jax.Array, np.ndarray]:
         return self.mean + self.scaling * x
 
-    def scale_back(self, x: ArrayLike) -> ArrayLike:
+    def scale_back(self, x: Union[jax.Array, np.ndarray]) -> Union[jax.Array, np.ndarray]:
         return (x - self.mean) / self.scaling
 
-    def get_random(self, n: int = 1) -> ArrayLike:
+    def get_random(self, n: int = 1) -> Union[jax.Array, np.ndarray]:
         return self.scale(np.random.randn(n))
 
 
 class GaussHermite(GeneratorMultiD):
 
-    def __init__(self, mean: ArrayLike = None, scaling: ArrayLike = None, dim: int = None):
+    def __init__(
+        self, mean: Union[jax.Array, np.ndarray] = None, scaling: Union[jax.Array, np.ndarray] = None, dim: int = None
+    ):
         dim = dim
         if dim is None:
             if scaling is not None:
@@ -63,8 +66,8 @@ class GaussHermite(GeneratorMultiD):
     def __repr__(self) -> str:
         return f"Gauss Hermite (d = {self.dim}, mean = {self.mean.tolist()}, scaling = {self.scaling.tolist()})"
 
-    def scale(self, x: ArrayLike) -> ArrayLike:
+    def scale(self, x: Union[jax.Array, np.ndarray]) -> Union[jax.Array, np.ndarray]:
         return self.mean + self.scaling * x
 
-    def scale_back(self, x: ArrayLike) -> ArrayLike:
+    def scale_back(self, x: Union[jax.Array, np.ndarray]) -> Union[jax.Array, np.ndarray]:
         return (x - self.mean) / self.scaling

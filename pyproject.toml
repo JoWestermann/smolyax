@@ -24,7 +24,9 @@ dev = [
     "pytype",
     "black",
     "flake8",
-    "flake8-pyproject"
+    "flake8-pyproject",
+    "pdoc",
+    "mypy"
 ]
 
 [tool.black]
@@ -42,3 +44,8 @@ disable = ["import-error"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.mypy]
+ignore_missing_imports = true
+check_untyped_defs = false
+no_implicit_optional = false
