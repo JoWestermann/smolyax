@@ -8,6 +8,21 @@ from numpy.typing import ArrayLike
 from jax_smolyak import indices, nodes
 
 
+def sparse_index_to_dense(nu: tuple[tuple[int, int], ...], dim: int) -> tuple:
+    dense_nu = [0] * dim
+    for k, v in nu:
+        dense_nu[k] = v
+    return tuple(dense_nu)
+
+
+def dense_index_to_sparse(dense_nu: tuple[int]) -> tuple[tuple[int, int], ...]:
+    sparse_nu = []
+    for k, v in enumerate(dense_nu):
+        if v > 0:
+            sparse_nu.append((k, v))
+    return tuple(sparse_nu)
+
+
 def generate_nodes_default(*, dmin: int, dmax: int) -> List[nodes.Generator]:
     sets = []
     for d in range(dmin, dmax + 1):
@@ -69,6 +84,6 @@ def generate_test_function_smolyak(*, node_gen: nodes.Generator, k: ArrayLike, t
     for ti in t:
         idxs = indices.indexset(k, ti)
         j = np.random.randint(len(idxs))
-        selected_idxs.append(indices.sparse_index_to_dense(idxs[j], dim=len(k)))
+        selected_idxs.append(sparse_index_to_dense(idxs[j], dim=len(k)))
     print("\t Test polynomials with degrees", selected_idxs)
     return lambda x: np.array([evaluate_multivariate_polynomial(node_gen, nu, x) for nu in selected_idxs]).T
