@@ -103,10 +103,21 @@ def abs_e(k, t, i=0, e=None, *, nu: dict[int, int] = None):
 
 
 @njit(cache=True)
-def _abs_e_subtree_stack(k, d, rem_t, parity):
+def __subtree_sum(k: np.ndarray, d: int, rem_t: float, parity: int) -> int:
     """
-    Suffix sum of (-1)^e exactly matching abs_e_list:
-    always recurse from i=0 over all dimensions.
+    Compute \sum (-1)^e
+    by an iterative stack walk, seeded with `parity` = sum(prefix_j) % 2.
+
+    Parameters
+    ----------
+    k       : 1D numpy array of float64 weights
+    d       : int, number of dimensions (len(k))
+    rem_t   : float, remaining budget after prefix
+    parity  : int, initial parity (0 or 1)
+
+    Returns
+    -------
+    total   : int, the alternating sum of (-1)^e over the subtree
     """
     total = 0
     stack = [(0, rem_t, parity)]
@@ -144,7 +155,7 @@ def non_nested_cardinality(k, t):
 
         # terminal skip‐branch?
         if dim_i >= d or not (dim_i + 1 < d and k[dim_i + 1] < rem_t):
-            s = _abs_e_subtree_stack(k, d, rem_t, parity)
+            s = __subtree_sum(k, d, rem_t, parity)
             if s != 0:
                 total += prod_n
 
@@ -170,31 +181,11 @@ def smolyak_coefficient_zeta(k, t: float, *, nu: dict[int, int] = None):
     return np.sum([(-1) ** e for e in abs_e(k, t, nu=nu)])
 
 
-@njit(cache=True)
-def _subtree_zeta(k, d, rem_t):
-    total = 0
-    stack = [(0, rem_t, 0)]
-    while stack:
-        i, rt, e = stack.pop()
-        if i >= d:
-            total += 1 - ((e & 1) << 1)
-            continue
-        # skip‐case
-        if i + 1 < d and k[i + 1] < rt:
-            stack.append((i + 1, rt, e))
-        else:
-            total += 1 - ((e & 1) << 1)
-        # include‐case
-        if k[i] < rt:
-            stack.append((i + 1, rt - k[i], e ^ 1))
-    return total
-
-
 def non_zero_indices_and_zetas(k, t):
     """
     Constructs the non-zero coefficient indices and their coefficeints in one DFS:
      – similar to indexset(k,t)
-     – at each 'terminal' nu, calls subtree_sum(rem_t)
+     – at each 'terminal' nu, calls __subtree_sum
      – if zeta != 0, groups nu by len(nu)
     """
     d = len(k)
@@ -205,7 +196,7 @@ def non_zero_indices_and_zetas(k, t):
         i, rem_t, nu = stack.pop()
         # terminal skip check
         if i >= d or not (i + 1 < d and k[i + 1] < rem_t):
-            zeta = _subtree_zeta(k, d, rem_t)
+            zeta = __subtree_sum(k, d, rem_t, 0)
             if zeta != 0:
                 n = len(nu)
                 n2nus[n].append(nu)
