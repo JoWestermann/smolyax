@@ -142,10 +142,21 @@ def smolyak_coefficient_zeta(k, t: float, *, nu: dict[int, int] = None):
 
 
 @njit(cache=True)
-def _abs_e_subtree_stack(k, d, rem_t, parity):
+def __subtree_sum(k: np.ndarray, d: int, rem_t: float, parity: int) -> int:
     """
-    Suffix sum of (-1)^e exactly matching abs_e_list:
-    always recurse from i=0 over all dimensions.
+    Compute \sum (-1)^e
+    by an iterative stack walk, seeded with `parity` = sum(prefix_j) % 2.
+
+    Parameters
+    ----------
+    k       : 1D numpy array of float64 weights
+    d       : int, number of dimensions (len(k))
+    rem_t   : float, remaining budget after prefix
+    parity  : int, initial parity (0 or 1)
+
+    Returns
+    -------
+    total   : int, the alternating sum of (-1)^e over the subtree
     """
     total = 0
     stack = [(0, rem_t, parity)]  # dimension, threshold, parity
@@ -189,7 +200,7 @@ def __nodeset_cardinality_non_nested(k: Sequence[float], t: float) -> int:
 
         # Check if the stack entry is final
         if i >= len(k) or k[i] >= rem_t:
-            zeta = _abs_e_subtree_stack(k, d, rem_t, parity)
+            zeta = __subtree_sum(k, d, rem_t, parity)
             if zeta != 0:
                 total += prod_n
             continue
@@ -210,33 +221,11 @@ def __nodeset_cardinality_non_nested(k: Sequence[float], t: float) -> int:
     return total
 
 
-@njit(cache=True)
-def _subtree_zeta(k, d, rem_t):
-    stack = [(0, rem_t, 0)]  # dimension, threshold, zeta
-    total = 0
-
-    while stack:
-        i, rt, e = stack.pop()
-
-        # Check if the stack entry is final
-        if i >= d or k[i] >= rt:
-            total += 1 - ((e & 1) << 1)
-            continue
-
-        # Add case e_i = 0 on to the stack
-        stack.append((i + 1, rt, e))
-
-        # Add case e_i = 1 on to the stack if admissible
-        if k[i] < rt:
-            stack.append((i + 1, rt - k[i], e ^ 1))
-    return total
-
-
 def non_zero_indices_and_zetas(k, t):
     """
     Constructs the non-zero coefficient indices and their coefficeints in one DFS:
      – similar to indexset(k,t)
-     – at each 'terminal' nu, calls subtree_sum(rem_t)
+     – at each 'terminal' nu, calls __subtree_sum
      – if zeta != 0, groups nu by len(nu)
     """
     d = len(k)
@@ -248,7 +237,7 @@ def non_zero_indices_and_zetas(k, t):
 
         # Check if the stack entry is final
         if i >= d or k[i] >= rem_t:
-            zeta = _subtree_zeta(k, d, rem_t)
+            zeta = __subtree_sum(k, d, rem_t, 0)
             if zeta != 0:
                 n = len(nu)
                 n2nus[n].append(nu)
