@@ -77,7 +77,7 @@ class SmolyakBarycentricInterpolator:
         #   - self.n_f_evals_new counts only new function calls.
         # If evaluations are reused across interpolator instances, then likely self.n_f_evals_new < self.n_f_evals
 
-        self.n_f_evals = indices.cardinality(k, t, nested=self.is_nested)
+        self.n_f_evals = indices.nodeset_cardinality(k, t, nested=self.is_nested)
         self.n_f_evals_new = 0
 
     def __init_indices_sorting(self):
