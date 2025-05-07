@@ -1,3 +1,15 @@
+r"""
+This module contains functionality to compute $\boldsymbol{k}$-weighted anisotropic multi-index sets
+$\Lambda_{\boldsymbol{k}, t}$ and related data structures and quantities.
+
+For a given weight vector $\boldsymbol{k} \in \mathbb{R}^d$ the anisotropic multi-index set
+$\Lambda_{\boldsymbol{k}, t} \subset \mathbb{N}_0^d$ is defined as
+$$
+\Lambda_{\boldsymbol{k}, t} := \\{\boldsymbol{\nu} \in \mathbb{N}_0^{d_1} \ : \ \sum_{j=1}^{d_1} k_j \nu_j < t\\}.
+$$
+where $t > 0$ is a scalar threshold parameter that allows to control the size of the multi-index set.
+"""
+
 from collections import defaultdict
 from typing import Sequence
 
@@ -5,29 +17,28 @@ import numpy as np
 from numba import njit
 
 
-def indexset(k: Sequence[float], t: float):
+def indexset(k: Sequence[float], t: float) -> list[tuple[tuple[int, int]]]:
     r"""
-    Generate the `k`-weighted anisotropic multi-index set $\Lambda_{\boldsymbol{k}, t}$ with a given threshold `t`,
-    which is defined as
-    $$
-    \Lambda_{\boldsymbol{k}, t} := \\{\boldsymbol{\nu} \in \mathbb{N}_0^{d_1} \ : \ \sum_{j=1}^{d_1} k_j \nu_j < t\\}.
-    $$
+    Generate the $\boldsymbol{k}$-weighted anisotropic multi-index set
+    $\Lambda_{\boldsymbol{k}, t} \subset \mathbb{N}_0^d$ with threshold $t$.
 
     Parameters
     ----------
     k : Sequence[float]
-        Weight vector of the anisotropy of the multi-index set.
+        Weight vector of the anisotropy of the multi-index set. The dimension $d$ is inferred as `len(k)`.
     t : float
-        Threshold parameter to control the size of the multi-index set.
+        Threshold parameter to control the cardinality of the multi-index set.
 
     Returns
     -------
     list of tuples
         A list of multi-indices that satisfy the k-weighted condition with threshold `t`. The multi-indices are given in
-        a tuple-based sparse format given as $((j, \nu_j))_{j \in \{0, \dots, d\} : \nu_j > 0}$.
+        a tuple-based sparse format given as $((j, \nu_j))_{j \in \\{0, \dots, d\\} : \nu_j > 0\}$.
 
     Notes
     -----
+    * To compute the cardinality of the set efficiently without constructing it use
+        [`indexset_cardinality()`](#indexset_cardinality).
     * To find a suitable threshold parameter `t` that allows to construct a `k`-weighted multi-index with a specified
         cardinality use [`find_approximate_threshold()`](#find_approximate_threshold).
     """
@@ -59,7 +70,28 @@ def indexset(k: Sequence[float], t: float):
 
 
 @njit(cache=True)
-def indexset_size(k, t):
+def indexset_cardinality(k: Sequence[float], t: float) -> int:
+    r"""
+    Compute the cardinality of the $\boldsymbol{k}$-weighted anisotropic multi-index set
+    $\Lambda_{\boldsymbol{k}, t} \subset \mathbb{N}_0^d$ with threshold $t$.
+
+    Parameters
+    ----------
+    k : Sequence[float]
+        Weight vector of the anisotropy of the multi-index set. The dimension $d$ is inferred as `len(k)`.
+    t : float
+        Threshold parameter to control the cardinality of the multi-index set.
+
+    Returns
+    -------
+    int
+        Cardinality of the multi-index set $\Lambda_{\boldsymbol{k}, t}$
+
+    Notes
+    -----
+    * The result of this method is equivalent to `len(indexset(k,t))` but computed significantly more effient, since
+        the index set is not explicitly constructed and numba compilation is used.
+    """
     d = len(k)
     stack = [(0, t)]  # dimension, threshold
     count = 0
@@ -136,8 +168,12 @@ def _abs_e_subtree_stack(k, d, rem_t, parity):
     return total
 
 
+def __nodeset_cardinality_nested(k: Sequence[float], t: float) -> int:
+    return indexset_cardinality(k, t)
+
+
 @njit(cache=True)
-def non_nested_cardinality(k, t):
+def __nodeset_cardinality_non_nested(k: Sequence[float], t: float) -> int:
     """
     For each nu in indexset(k,t):
     if sum((-1)**e for e in abs_e_list(k,t,nu)) != 0
@@ -231,10 +267,11 @@ def non_zero_indices_and_zetas(k, t):
     return n2nus, n2zetas
 
 
-def cardinality(k, t: float, nested: bool = False) -> int:
+def nodeset_cardinality(k: Sequence[float], t: float, nested: bool = False) -> int:
     if nested:
-        return indexset_size(k, t)
-    return non_nested_cardinality(k, t)
+        return __nodeset_cardinality_nested(k, t)
+    else:
+        return __nodeset_cardinality_non_nested(k, t)
 
 
 def find_approximate_threshold(
@@ -278,9 +315,9 @@ def find_approximate_threshold(
 
     # establish search interval
     l_interval = [1.0, 2.0]
-    while cardinality(k, l_interval[0], nested) > m:
+    while nodeset_cardinality(k, l_interval[0], nested) > m:
         l_interval = [l_interval[0] / 1.2, l_interval[0]]
-    while cardinality(k, l_interval[1], nested) < m:
+    while nodeset_cardinality(k, l_interval[1], nested) < m:
         l_interval = [l_interval[1], l_interval[1] * 1.2]
 
     # bisect search interval
@@ -288,14 +325,14 @@ def find_approximate_threshold(
         return interval[0] + (interval[1] - interval[0]) / 2.0
 
     t_cand = midpoint(l_interval)
-    m_cand = cardinality(k, t_cand, nested)
+    m_cand = nodeset_cardinality(k, t_cand, nested)
     for _ in range(max_iter):
         if m_cand > m:
             l_interval = [l_interval[0], t_cand]
         else:
             l_interval = [t_cand, l_interval[1]]
         t_cand = midpoint(l_interval)
-        m_cand = cardinality(k, t_cand, nested)
+        m_cand = nodeset_cardinality(k, t_cand, nested)
 
         if np.abs(m_cand - m) / m < accuracy:
             break
