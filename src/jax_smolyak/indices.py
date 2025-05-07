@@ -5,21 +5,6 @@ import numpy as np
 from numba import njit
 
 
-def sparse_index_to_dense(nu: tuple[tuple[int, int], ...], dim: int) -> tuple:
-    dense_nu = [0] * dim
-    for k, v in nu:
-        dense_nu[k] = v
-    return tuple(dense_nu)
-
-
-def dense_index_to_sparse(dense_nu: tuple[int]) -> tuple[tuple[int, int], ...]:
-    sparse_nu = []
-    for k, v in enumerate(dense_nu):
-        if v > 0:
-            sparse_nu.append((k, v))
-    return tuple(sparse_nu)
-
-
 def indexset(k: Sequence[float], t: float):
     r"""
     Generate the `k`-weighted anisotropic multi-index set $\Lambda_{\boldsymbol{k}, t}$ with a given threshold `t`,
