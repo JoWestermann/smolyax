@@ -39,7 +39,7 @@ def test_find_threshold_runtime(benchmark, d, m, nested):
         sys.setrecursionlimit(limit)
     k = np.log([2 + i for i in range(d)]) / np.log(2)
     t = benchmark(lambda: indices.find_approximate_threshold(k, m, nested=nested, accuracy=accuracy))
-    assert np.abs(indices.cardinality(k, t, nested=nested) - m) / m < accuracy, f"d={d}, m={m}"
+    assert np.abs(indices.nodeset_cardinality(k, t, nested=nested) - m) / m < accuracy, f"d={d}, m={m}"
 
 
 @pytest.mark.parametrize(
