@@ -229,6 +229,29 @@ def non_zero_indices_and_zetas(k, t):
 
 
 def nodeset_cardinality(k: Sequence[float], t: float, nested: bool = False) -> int:
+    r"""
+    Compute the cardinality of the set of interpolation nodes associated with the multi-index set
+    $\Lambda_{\boldsymbol{k}, t}$.
+
+    Parameters
+    ----------
+    k : Sequence[float]
+        Weight vector of the anisotropy of the multi-index set. The dimension $d$ is inferred as `len(k)`.
+    t : float
+        Threshold parameter to control the cardinality of the multi-index set.
+    nested : bool
+        Boolean flag specifying whether the sequence of interpolation nodes used is nested or not.
+
+    Returns
+    -------
+    int
+        Cardinality of the set of interpolation nodes specified by $\Lambda_{\boldsymbol{k}, t}$.
+
+    Notes
+    -----
+    * If `nested = True`, then the cardinality of the set of interpolation nodes is equal to the cardinality of
+        $\Lambda_{\boldsymbol{k}, t}.$
+    """
     if nested:
         return __nodeset_cardinality_nested(k, t)
     else:
