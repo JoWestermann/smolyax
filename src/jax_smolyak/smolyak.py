@@ -13,10 +13,6 @@ jax.config.update("jax_enable_x64", True)
 
 class SmolyakBarycentricInterpolator:
 
-    @property
-    def is_nested(self) -> bool:
-        return self._is_nested
-
     def __init__(
         self,
         *,
@@ -49,7 +45,7 @@ class SmolyakBarycentricInterpolator:
         """
         self.d_in = len(k)
         self.d_out = d_out
-        self._is_nested = node_gen.is_nested
+        self.__is_nested = node_gen.is_nested
         self.__node_gen = node_gen
 
         # Step 1 : Bin multiindices and smolyak coefficients by the number of active dimensions, n
@@ -77,7 +73,7 @@ class SmolyakBarycentricInterpolator:
         #   - self.n_f_evals_new counts only new function calls.
         # If evaluations are reused across interpolator instances, then likely self.n_f_evals_new < self.n_f_evals
 
-        self.n_f_evals = indices.nodeset_cardinality(k, t, nested=self.is_nested)
+        self.n_f_evals = indices.nodeset_cardinality(k, t, nested=self.__is_nested)
         self.n_f_evals_new = 0
 
     def __init_indices_sorting(self):
@@ -200,7 +196,7 @@ class SmolyakBarycentricInterpolator:
 
         # Special case n = 0
         nu = ()
-        if self.is_nested:
+        if self.__is_nested:
             f_evals_nu = f_evals
         else:
             f_evals_nu = f_evals.get(nu, {})
@@ -209,7 +205,7 @@ class SmolyakBarycentricInterpolator:
             self.n_f_evals_new += 1
         self.offset *= f_evals_nu[nu]
 
-        if not self.is_nested:
+        if not self.__is_nested:
             f_evals[nu] = f_evals_nu
 
         # n > 0
@@ -218,7 +214,7 @@ class SmolyakBarycentricInterpolator:
             for i, nu in enumerate(self.n_2_nus[n]):
                 x = self.__zero.copy()
 
-                if self.is_nested:
+                if self.__is_nested:
                     f_evals_nu = f_evals
                 else:
                     f_evals_nu = f_evals.get(nu, {})
@@ -236,7 +232,7 @@ class SmolyakBarycentricInterpolator:
                         self.n_f_evals_new += 1
                     F_i[:, *mu_degrees] = f_evals_nu[mu_tuple]
 
-                if not self.is_nested:
+                if not self.__is_nested:
                     f_evals[nu] = f_evals_nu
 
             # cast to jnp data structures
