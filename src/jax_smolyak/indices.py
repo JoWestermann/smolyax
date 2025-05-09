@@ -197,12 +197,29 @@ def __nodeset_cardinality_non_nested(k: Sequence[float], t: float) -> int:
     return total
 
 
-def non_zero_indices_and_zetas(k, t):
-    """
-    Constructs the non-zero coefficient indices and their coefficeints in one DFS:
-     – similar to indexset(k,t)
-     – at each 'terminal' nu, calls __subtree_sum
-     – if zeta != 0, groups nu by len(nu)
+def non_zero_indices_and_zetas(
+    k: Sequence[float], t: float
+) -> tuple[defaultdict[int, list[tuple[tuple[int, int], ...]]], defaultdict[int, list[float]]]:
+    r"""
+    Computes the subset of multi-indices $\boldsymbol{\nu}$ in $\Lambda_{\boldsymbol{k}, t}$ that have non-zero Smolyak
+    coeffcient $\zeta_{\Lambda_{\boldsymbol{k},t}, \boldsymbol{\nu}}$, as well as these Smolyak coefficients, grouped
+    by the sparsity level $n$ (numer of non-zero entries in the multi-index $\boldsymbol{\nu}$).
+
+    Parameters
+    ----------
+    k : Sequence[float]
+        Weight vector of the anisotropy of the multi-index set. The dimension $d$ is inferred as `len(k)`.
+    t : float
+        Threshold parameter to control the cardinality of the multi-index set.
+
+    Returns
+    -------
+    n2nus : defaultdict[int, list[tuple[tuple[int, int], ...]]]
+        Dictionary mapping sparsity level $n$ to the list of multi-indices $\boldsymbol{\nu}$
+        with $n$ non-zero entries and non-zero Smolyak coefficients.
+    n2zetas : defaultdict[int, list[float]]
+        Dictionary mapping sparsity level $n$ to the list of corresponding non-zero Smolyak coefficients
+        $\zeta_{\Lambda_{\boldsymbol{k}, t}, \boldsymbol{\nu}}$.
     """
     d = len(k)
     n2nus, n2zetas = defaultdict(list), defaultdict(list)
