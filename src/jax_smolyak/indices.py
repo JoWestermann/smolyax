@@ -121,19 +121,33 @@ def indexset_cardinality(k: Sequence[float], t: float) -> int:
 @njit(cache=True)
 def smolyak_coefficient(k: np.ndarray, d: int, rem_t: float, parity: int) -> int:
     r"""
-    Compute $\sum (-1)^e$
-    by an iterative stack walk, seeded with `parity` = sum(prefix_j) % 2.
+    Computes the smolyak coefficient $\zeta_{\Lambda_{\boldsymbol{k},t}, \boldsymbol{\nu}} := \sum
+    \limits_{\boldsymbol{e} \in \\{0,1\\}^d : \boldsymbol{\nu}+\boldsymbol{e} \in \Lambda_{\boldsymbol{k},t}}
+    (-1)^{|\boldsymbol{e}|}$.
+
+    However, instead of taking $\boldsymbol{\nu}$ and checking for every $\boldsymbol{e} \in \\{0,1\\}^d$ whether
+    $\sum_{j=1}^d (\nu_j + e_j) k_j < t$, the function takes the *remaining* threshold value
+    $\tilde{t}_{t, \boldsymbol{k}, \boldsymbol{\nu}} := t - \sum_{j=1}^d \nu_j k_j$.
+    and then checks for all $\boldsymbol{e}$ whether $\sum_{j=1}^d e_j k_j < t_{\boldsymbol{k}, \boldsymbol{\nu}}.$
+
+    For efficiency, the indices $\boldsymbol{e}$ are not constructed explicitly. Instead, the parity of the exponent
+    $|\boldsymbol{e}|$ is tracked by bit-flips while iterating over the dimensions $j \in \\{0, \dots, d\\}.q$
 
     Parameters
     ----------
-    k       : 1D numpy array of float64 weights
-    d       : int, number of dimensions (len(k))
-    rem_t   : float, remaining budget after prefix
-    parity  : int, initial parity (0 or 1)
+    k : Sequence[float]
+        Weight vector of the anisotropy of the multi-index set.
+    d : int
+        Number of dimensions (equal to `len(k)`)
+    rem_t : float
+        Remaining threshold value $\tilde{t}_{t, \boldsymbol{k}, \boldsymbol{\nu}} := t - \sum_{j=1}^d \nu_j k_j$
+    parity : int
+        Initial parity (0 or 1).
 
     Returns
     -------
-    total   : int, the alternating sum of (-1)^e over the subtree
+    int
+        The Smolyak coefficient $\zeta_{\Lambda_{\boldsymbol{k},t}, \boldsymbol{\nu}}.$
     """
     total = 0
     stack = [(0, rem_t, parity)]
