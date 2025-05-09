@@ -1,5 +1,5 @@
 ---
-title: 'jax-smolyak: A high-performance implementation of the Smolyak interpolation operator'
+title: 'jax-smolyak: a high-performance implementation of the Smolyak interpolation operator'
 tags:
   - Python
   - JAX
@@ -48,23 +48,26 @@ header-includes:
 
 The `jax-smolyak` library provides interpolation capabilities for arbitrary multivariate and vector-valued functions $f : \mathbb{R}^{d_1} \to \mathbb{R}^{d_2}$ for any $d_1, d_2 \in \mathbb{N}$.
 
-It implements the Smolyak interpolation operator, which is known to overcome the curse-of-dimensionality plaguing naive multivariate interpolation. The implementation is based on JAX [@jax:2018], a free and open-source Python library for high-performance computing that integrates seamlessly with the Python ecosystem. Thanks to JAX's device management, `jax-smolyak` runs natively on both CPU and GPU. While implementing Smolyak interpolation in JAX is challenging due to the highly irregular data structures involved, `jax-smolyak` overcomes this by employing a tailored batching and padding strategy (described below), enabling efficient vectorization, scalability, and parallel execution.
+It implements the Smolyak interpolation operator, which is known to overcome the curse-of-dimensionality plaguing naive multivariate interpolation [@barthelmann:2000]. The implementation is based on JAX [@jax:2018], a free and open-source Python library for high-performance computing that integrates seamlessly with the Python ecosystem. Thanks to JAX's device management, `jax-smolyak` runs natively on both CPU and GPU. While implementing Smolyak interpolation in JAX is challenging due to the highly irregular data structures involved, `jax-smolyak` overcomes this by employing a tailored batching and padding strategy (described below), enabling efficient vectorization, scalability, and parallel execution.
 
-`jax-smolyak` supports interpolation on sparse grids based on either Leja [@chkifa:2013] or Gauss-Hermite interpolation nodes and characterized by anisotropic multi-index sets of the form
+`jax-smolyak` supports sparse grid [@bungartz:2004] interpolation nodes based on either Leja [@chkifa:2013] or Gauss-Hermite
+[@abramowitz:1964] node sequences and characterized by $\bsk$-weighted anisotropic multi-index sets
 $$
-\Lambda_{\bsk, \ell} := \{\bsnu \in \mathbb{N}_0^{d_1} : \sum_{j=1}^{d_1} k_j \nu_j < \ell\},
+\Lambda_{\bsk, t} := \{\bsnu \in \mathbb{N}_0^{d_1} : \sum_{j=1}^{d_1} k_j \nu_j < t\},
 $$
-where $\bsk \in \mathbb{R}^{d_1}$. In the special case $\bsk = (1)_{j=1}^{d_1}$, this reduces to the classical total-degree multi-index set. Additional types of interpolation nodes or multi-index sets can be incorporated easily by implementing a minimalistic interface.
+for $\bsk \in \mathbb{R}^{d_1}$ and $t > 0$. In the special case $\bsk = (1)_{j=1}^{d_1}$, this reduces to the classical total-degree multi-index set. Additional types of interpolation nodes or multi-index sets can be incorporated easily by implementing a minimalistic interface.
 
 # Statement of Need
 
-Polynomial approximation is a well-studied and powerful tool in applied mathematics, with important applications, for example, in surrogate modeling and uncertainty quantification. Due to their deterministic construction and the availability of error bounds for a wide range of function classes, polynomial surrogates can serve as both a reliable and cost-effective alternative to neural networks — for example, in constructing operator surrogates [@herrmann:2024; @westermann:2025].
+Polynomial expansion is a well-studied and powerful tool in applied mathematics, with important applications, for example, in surrogate modeling, uncertainty quantification and inverse problems, see e.g. [@adcock:2022; @dung:2023; @zech:2018; @chkifa:2015; @herrmann:2024; @westermann:2025] and references therein.
+
+Smolyak interpolation offers a practical way to construct polynomial approximations with known error bounds for a wide range of function classes, see e.g. [@barthelmann:2000; @chkifa:2015].
 
 While several libraries provide high-dimensional interpolation functionality, none, to our knowledge, provides a hardware-agnostic, high performance implementation. `jax-smolyak` addresses this gap by providing an efficient solution within the popular JAX ecosystem.
 
 # High-dimensional interpolation with the Smolyak operator
 
-We briefly summarize the essentials of high-dimensional interpolation, where sparse grids have become the standard choice for interpolation points. In this setting, the interpolation operator is commonly referred to as the Smolyak operator. This overview provides background and establishes notation, which will be used to describe our specific implementation choices in the next section. For ease of notation, the following discussions we will focus on scalar-valued interpolation targets (i.e., on the case $d_1 = d$ and $d_2 = 1$), while the extension to vector-valued functions is straightforward.
+We briefly summarize the essentials of high-dimensional interpolation, where sparse grids have become the standard choice for interpolation points. In this setting, the interpolation operator is commonly referred to as the Smolyak operator. This overview provides background and establishes notation, which will be used to describe our specific implementation choices in the next section. For ease of notation, the following discussions we will focus on scalar-valued interpolation targets (i.e., on the case $d_1 = d$ and $d_2 = 1$), while the extension to vector-valued functions follows straightforward by interpolating each output vector element individually.
 
 **Univariate interpolation.** Given a domain $D \subset \R$ and set of $\nu \in \N$ pairwise distinct interpolation points $(\xi^\nu_i)_{i=0}^\nu \subset D$, the polynomial interpolation operator $I^\nu : C^0(D) \to \bbP_\nu := {\rm span} \set{x^i}{i=0,\dots,\nu}$ maps a function $f : D \to \R$ onto the unique polynomial $I^\nu [f]$ of maximal degree $\nu$ such that $f(\xi^\nu_i) = I^\nu [f](\xi^\nu_i)$ for all $i\in\{0,1,\dots,\nu\}$.
 
@@ -101,7 +104,7 @@ and vectors $\bsb^{\nu_j} (x_j) \in \R^{\nu_j+1}$ given as
   j \in \{1, \dots, d\}.
 \end{equation*}
 
-**Smolyak interpolation** [@smolyak:1963; @barthelmann:2000; @adcock:2022] overcomes the curse-of-dimensionality that characterizes tensor-product interpolation \eqref{eq:ip_tensorproduct}, by introducing polynomial ansatz spaces $\bbP_\Lambda := {\rm span} \set{\bsx^\bsmu}{\bsmu \in \Lambda}$ parametrized by downward closed multi-index sets $\Lambda \subset \N_0^d$. The resulting interpolation operator is then a linear combination of tensorized interpolation operators:
+**Smolyak interpolation** [@smolyak:1963; @barthelmann:2000] overcomes the curse-of-dimensionality that characterizes tensor-product interpolation \eqref{eq:ip_tensorproduct}, by introducing polynomial ansatz spaces $\bbP_\Lambda := {\rm span} \set{\bsx^\bsmu}{\bsmu \in \Lambda}$ parametrized by downward closed multi-index sets $\Lambda \subset \N_0^d$. The resulting interpolation operator is then a linear combination of tensorized interpolation operators:
 \begin{equation} \label{eq:ip_smolyak}
     I^\Lambda := \sum \limits_{\bsnu \in \Lambda} \zeta_{\Lambda, \bsnu} I^\bsnu, \qquad \zeta_{\Lambda, \bsnu} := \sum \limits_{\bse \in \{0,1\}^d : \bsnu+\bse \in \Lambda} (-1)^{|\bse|}.
 \end{equation}
