@@ -40,7 +40,7 @@ def indexset(k: Sequence[float], t: float) -> list[tuple[tuple[int, int]]]:
     * To compute the cardinality of the set efficiently without constructing it use
         [`indexset_cardinality()`](#indexset_cardinality).
     * To find a suitable threshold parameter `t` that allows to construct a `k`-weighted multi-index with a specified
-        cardinality use [`find_approximate_threshold()`](#find_approximate_threshold).
+        cardinality use [`find_approximate_threshold()`](#find_approximate_threshold) with `nested = True`.
     """
     d = len(k)
     stack = [(0, t, ())]  # dimension, threshold, multi-index head (entries in the first dimensions)
@@ -85,12 +85,12 @@ def indexset_cardinality(k: Sequence[float], t: float) -> int:
     Returns
     -------
     int
-        Cardinality of the multi-index set $\Lambda_{\boldsymbol{k}, t}$
+        Cardinality of the multi-index set $\Lambda_{\boldsymbol{k}, t}.$
 
     Notes
     -----
-    * The result of this method is equivalent to `len(indexset(k,t))` but computed significantly more effient, since
-        the index set is not explicitly constructed and numba compilation is used.
+    * The result of this method is equivalent to `len(indexset(k, t))`, but it is computed significantly more
+        efficiently since the index set is not explicitly constructed and numba compilation is used."
     """
     stack = [(0, 0.0)]  # dimension, threshold
     count = 0
