@@ -119,7 +119,7 @@ def indexset_cardinality(k: Sequence[float], t: float) -> int:
 
 
 @njit(cache=True)
-def __subtree_sum(k: np.ndarray, d: int, rem_t: float, parity: int) -> int:
+def smolyak_coefficient(k: np.ndarray, d: int, rem_t: float, parity: int) -> int:
     r"""
     Compute $\sum (-1)^e$
     by an iterative stack walk, seeded with `parity` = sum(prefix_j) % 2.
@@ -175,8 +175,8 @@ def __nodeset_cardinality_non_nested(k: Sequence[float], t: float) -> int:
 
         # terminal skip‐branch?
         if dim_i >= d or not (dim_i + 1 < d and k[dim_i + 1] < rem_t):
-            s = __subtree_sum(k, d, rem_t, parity)
-            if s != 0:
+            zeta = smolyak_coefficient(k, d, rem_t, parity)
+            if zeta != 0:
                 total += prod_n
 
         # now expand exactly like your original indexset
@@ -212,7 +212,7 @@ def non_zero_indices_and_zetas(k, t):
         i, rem_t, nu = stack.pop()
         # terminal skip check
         if i >= d or not (i + 1 < d and k[i + 1] < rem_t):
-            zeta = __subtree_sum(k, d, rem_t, 0)
+            zeta = smolyak_coefficient(k, d, rem_t, 0)
             if zeta != 0:
                 n = len(nu)
                 n2nus[n].append(nu)
