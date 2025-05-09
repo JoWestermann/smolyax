@@ -13,6 +13,16 @@ jax.config.update("jax_enable_x64", True)
 
 class SmolyakBarycentricInterpolator:
 
+    @property
+    def d_in(self) -> int:
+        """Input dimension of target function and interpolant"""
+        return self.__d_in
+
+    @property
+    def d_out(self) -> int:
+        """Output dimension of target function and interpolant"""
+        return self.__d_out
+
     def __init__(
         self,
         *,
@@ -43,8 +53,8 @@ class SmolyakBarycentricInterpolator:
         batchsize : int, default=250
             Anticipated batch size of the interpolator input, used for pre-compiling the `__call__` method.
         """
-        self.d_in = len(k)
-        self.d_out = d_out
+        self.__d_in = len(k)
+        self.__d_out = d_out
         self.__is_nested = node_gen.is_nested
         self.__node_gen = node_gen
 
@@ -158,7 +168,7 @@ class SmolyakBarycentricInterpolator:
             tau = tuple(int(ti) for ti in sorted_degs.max(axis=0))
 
             # allocate the F array
-            self.n_2_F[n] = np.zeros((nn, self.d_out) + tuple(ti + 1 for ti in tau), dtype=float)
+            self.n_2_F[n] = np.zeros((nn, self.__d_out) + tuple(ti + 1 for ti in tau), dtype=float)
 
             # build  nodes & weights via slicing
             self.n_2_nodes[n], self.n_2_weights[n] = self.__build_nodes_weights(
@@ -347,7 +357,7 @@ class SmolyakBarycentricInterpolator:
                 __create_evaluate_tensorproduct_interpolant_for_vmap(n),
                 in_axes=(None, 0) + (0,) * (2 * n) + (0, 0),
             )
-        _ = self(jax.random.uniform(jax.random.PRNGKey(0), (batchsize, self.d_in)))
+        _ = self(jax.random.uniform(jax.random.PRNGKey(0), (batchsize, self.__d_in)))
 
     def __call__(self, x: Union[jax.Array, np.ndarray]) -> jax.Array:
         """@public
@@ -369,9 +379,9 @@ class SmolyakBarycentricInterpolator:
             self.n_2_F
         ), "The operator has not yet been compiled for a target function."
         x = jnp.asarray(x)
-        if x.shape == (self.d_in,):
+        if x.shape == (self.__d_in,):
             x = x[None, :]
-        I_Lambda_x = jnp.broadcast_to(self.offset, (x.shape[0], self.d_out))
+        I_Lambda_x = jnp.broadcast_to(self.offset, (x.shape[0], self.__d_out))
         for n in self.__compiledfuncs.keys():
             res = self.__compiledfuncs[n](
                 x,
