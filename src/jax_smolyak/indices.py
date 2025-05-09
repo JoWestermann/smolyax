@@ -118,29 +118,6 @@ def indexset_cardinality(k: Sequence[float], t: float) -> int:
     return count
 
 
-# deprecated
-def abs_e(k, t, i=0, e=None, *, nu: dict[int, int] = None):
-    if e is None:
-        assert i == 0 and nu is not None
-        e = 0
-        t -= np.sum([v * k[j] for j, v in nu])
-    if i >= len(k):
-        return [e]
-    r = []
-    if i + 1 < len(k) and k[i + 1] < t:
-        r += abs_e(k, t, i + 1, e)
-    else:
-        r += [e]
-    if k[i] < t:
-        r += abs_e(k, t - k[i], i + 1, e + 1)
-    return r
-
-
-# deprecated
-def smolyak_coefficient_zeta(k, t: float, *, nu: dict[int, int] = None):
-    return np.sum([(-1) ** e for e in abs_e(k, t, nu=nu)])
-
-
 @njit(cache=True)
 def __subtree_sum(k: np.ndarray, d: int, rem_t: float, parity: int) -> int:
     r"""

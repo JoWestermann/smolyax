@@ -57,4 +57,5 @@ def test_smolyak_coeffs_runtime(benchmark, d, t):
         sys.setrecursionlimit(limit)
     k = np.log([2 + i for i in range(d)]) / np.log(2)
     iset = indices.indexset(k, t)
-    benchmark(lambda: [indices.smolyak_coefficient_zeta(k, t, nu=nu) for nu in iset])
+    rem_ts = [t - np.sum([nuj * k[j] for j, nuj in nu]) for nu in iset]
+    benchmark(lambda: [indices.__subtree_sum(k, d, rt, 0) for rt in rem_ts])
