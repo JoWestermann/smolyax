@@ -216,8 +216,8 @@ def non_zero_indices_and_zetas(
 ) -> tuple[defaultdict[int, list[tuple[tuple[int, int], ...]]], defaultdict[int, list[float]]]:
     r"""
     Computes the subset of multi-indices $\boldsymbol{\nu}$ in $\Lambda_{\boldsymbol{k}, t}$ that have non-zero Smolyak
-    coeffcient $\zeta_{\Lambda_{\boldsymbol{k},t}, \boldsymbol{\nu}}$, as well as these Smolyak coefficients, grouped
-    by the sparsity level $n$ (numer of non-zero entries in the multi-index $\boldsymbol{\nu}$).
+    coefficient $\zeta_{\Lambda_{\boldsymbol{k},t}, \boldsymbol{\nu}}$, as well as these Smolyak coefficients, grouped
+    by the sparsity level $n$ (number of non-zero entries in the multi-index $\boldsymbol{\nu}$).
 
     Parameters
     ----------
