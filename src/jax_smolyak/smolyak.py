@@ -12,6 +12,9 @@ jax.config.update("jax_enable_x64", True)
 
 
 class SmolyakBarycentricInterpolator:
+    """
+    A class implementing the Smolyak operator to interpolate high-dimensional and vector-valued functions.
+    """
 
     @property
     def d_in(self) -> int:
