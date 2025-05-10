@@ -40,7 +40,7 @@ def indexset(k: Sequence[float], t: float) -> list[tuple[tuple[int, int]]]:
     * To compute the cardinality of the set efficiently without constructing it use
         [`indexset_cardinality()`](#indexset_cardinality).
     * To find a suitable threshold parameter `t` that allows to construct a `k`-weighted multi-index with a specified
-        cardinality use [`find_approximate_threshold()`](#find_approximate_threshold).
+        cardinality use [`find_approximate_threshold()`](#find_approximate_threshold) with `nested = True`.
     """
     d = len(k)
     stack = [(0, t, ())]  # dimension, threshold, multi-index head (entries in the first dimensions)
@@ -85,12 +85,12 @@ def indexset_cardinality(k: Sequence[float], t: float) -> int:
     Returns
     -------
     int
-        Cardinality of the multi-index set $\Lambda_{\boldsymbol{k}, t}$
+        Cardinality of the multi-index set $\Lambda_{\boldsymbol{k}, t}.$
 
     Notes
     -----
-    * The result of this method is equivalent to `len(indexset(k,t))` but computed significantly more effient, since
-        the index set is not explicitly constructed and numba compilation is used.
+    * The result of this method is equivalent to `len(indexset(k, t))`, but it is computed significantly more
+        efficiently since the index set is not explicitly constructed and numba compilation is used."
     """
     stack = [(0, 0.0)]  # dimension, threshold
     count = 0
@@ -119,21 +119,35 @@ def indexset_cardinality(k: Sequence[float], t: float) -> int:
 
 
 @njit(cache=True)
-def __subtree_sum(k: np.ndarray, d: int, rem_t: float, parity: int) -> int:
+def smolyak_coefficient(k: np.ndarray, d: int, rem_t: float, parity: int) -> int:
     r"""
-    Compute $\sum (-1)^e$
-    by an iterative stack walk, seeded with `parity` = sum(prefix_j) % 2.
+    Computes the smolyak coefficient $\zeta_{\Lambda_{\boldsymbol{k},t}, \boldsymbol{\nu}} := \sum
+    \limits_{\boldsymbol{e} \in \\{0,1\\}^d : \boldsymbol{\nu}+\boldsymbol{e} \in \Lambda_{\boldsymbol{k},t}}
+    (-1)^{|\boldsymbol{e}|}$.
+
+    However, instead of taking $\boldsymbol{\nu}$ and checking for every $\boldsymbol{e} \in \\{0,1\\}^d$ whether
+    $\sum_{j=1}^d (\nu_j + e_j) k_j < t$, the function takes the *remaining* threshold value
+    $\tilde{t}_{t, \boldsymbol{k}, \boldsymbol{\nu}} := t - \sum_{j=1}^d \nu_j k_j$.
+    and then checks for all $\boldsymbol{e}$ whether $\sum_{j=1}^d e_j k_j < t_{\boldsymbol{k}, \boldsymbol{\nu}}.$
+
+    For efficiency, the indices $\boldsymbol{e}$ are not constructed explicitly. Instead, the parity of the exponent
+    $|\boldsymbol{e}|$ is tracked by bit-flips while iterating over the dimensions $j \in \\{0, \dots, d\\}.q$
 
     Parameters
     ----------
-    k       : 1D numpy array of float64 weights
-    d       : int, number of dimensions (len(k))
-    rem_t   : float, remaining budget after prefix
-    parity  : int, initial parity (0 or 1)
+    k : Sequence[float]
+        Weight vector of the anisotropy of the multi-index set.
+    d : int
+        Number of dimensions (equal to `len(k)`)
+    rem_t : float
+        Remaining threshold value $\tilde{t}_{t, \boldsymbol{k}, \boldsymbol{\nu}} := t - \sum_{j=1}^d \nu_j k_j$
+    parity : int
+        Initial parity (0 or 1).
 
     Returns
     -------
-    total   : int, the alternating sum of (-1)^e over the subtree
+    int
+        The Smolyak coefficient $\zeta_{\Lambda_{\boldsymbol{k},t}, \boldsymbol{\nu}}.$
     """
     total = 0
     stack = [(0, rem_t, parity)]
@@ -175,8 +189,8 @@ def __nodeset_cardinality_non_nested(k: Sequence[float], t: float) -> int:
 
         # terminal skip‐branch?
         if dim_i >= d or not (dim_i + 1 < d and k[dim_i + 1] < rem_t):
-            s = __subtree_sum(k, d, rem_t, parity)
-            if s != 0:
+            zeta = smolyak_coefficient(k, d, rem_t, parity)
+            if zeta != 0:
                 total += prod_n
 
         # now expand exactly like your original indexset
@@ -197,12 +211,29 @@ def __nodeset_cardinality_non_nested(k: Sequence[float], t: float) -> int:
     return total
 
 
-def non_zero_indices_and_zetas(k, t):
-    """
-    Constructs the non-zero coefficient indices and their coefficeints in one DFS:
-     – similar to indexset(k,t)
-     – at each 'terminal' nu, calls __subtree_sum
-     – if zeta != 0, groups nu by len(nu)
+def non_zero_indices_and_zetas(
+    k: Sequence[float], t: float
+) -> tuple[defaultdict[int, list[tuple[tuple[int, int], ...]]], defaultdict[int, list[float]]]:
+    r"""
+    Computes the subset of multi-indices $\boldsymbol{\nu}$ in $\Lambda_{\boldsymbol{k}, t}$ that have non-zero Smolyak
+    coefficient $\zeta_{\Lambda_{\boldsymbol{k},t}, \boldsymbol{\nu}}$, as well as these Smolyak coefficients, grouped
+    by the sparsity level $n$ (number of non-zero entries in the multi-index $\boldsymbol{\nu}$).
+
+    Parameters
+    ----------
+    k : Sequence[float]
+        Weight vector of the anisotropy of the multi-index set. The dimension $d$ is inferred as `len(k)`.
+    t : float
+        Threshold parameter to control the cardinality of the multi-index set.
+
+    Returns
+    -------
+    n2nus : defaultdict[int, list[tuple[tuple[int, int], ...]]]
+        Dictionary mapping sparsity level $n$ to the list of multi-indices $\boldsymbol{\nu}$
+        with $n$ non-zero entries and non-zero Smolyak coefficients.
+    n2zetas : defaultdict[int, list[float]]
+        Dictionary mapping sparsity level $n$ to the list of corresponding non-zero Smolyak coefficients
+        $\zeta_{\Lambda_{\boldsymbol{k}, t}, \boldsymbol{\nu}}$.
     """
     d = len(k)
     n2nus, n2zetas = defaultdict(list), defaultdict(list)
@@ -212,7 +243,7 @@ def non_zero_indices_and_zetas(k, t):
         i, rem_t, nu = stack.pop()
         # terminal skip check
         if i >= d or not (i + 1 < d and k[i + 1] < rem_t):
-            zeta = __subtree_sum(k, d, rem_t, 0)
+            zeta = smolyak_coefficient(k, d, rem_t, 0)
             if zeta != 0:
                 n = len(nu)
                 n2nus[n].append(nu)
@@ -229,6 +260,29 @@ def non_zero_indices_and_zetas(k, t):
 
 
 def nodeset_cardinality(k: Sequence[float], t: float, nested: bool = False) -> int:
+    r"""
+    Compute the cardinality of the set of interpolation nodes associated with the multi-index set
+    $\Lambda_{\boldsymbol{k}, t}$.
+
+    Parameters
+    ----------
+    k : Sequence[float]
+        Weight vector of the anisotropy of the multi-index set. The dimension $d$ is inferred as `len(k)`.
+    t : float
+        Threshold parameter to control the cardinality of the multi-index set.
+    nested : bool
+        Boolean flag specifying whether the sequence of interpolation nodes used is nested or not.
+
+    Returns
+    -------
+    int
+        Cardinality of the set of interpolation nodes specified by $\Lambda_{\boldsymbol{k}, t}$.
+
+    Notes
+    -----
+    * If `nested = True`, then the cardinality of the set of interpolation nodes is equal to the cardinality of
+        $\Lambda_{\boldsymbol{k}, t}.$
+    """
     if nested:
         return __nodeset_cardinality_nested(k, t)
     else:

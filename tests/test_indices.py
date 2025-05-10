@@ -69,8 +69,8 @@ def test_smolyak_coefficients():
         for nu_sparse in isparse:
             nu_dense = setup.sparse_index_to_dense(nu_sparse, dim=len(k))
             assert nu_dense in idense
-            c_sparse = indices_sparse.__subtree_sum(k, d, t - np.dot(nu_dense, k), 0)
-            c_dense = indices_dense.smolyak_coefficient_zeta(k, t, nu=nu_dense)
+            c_sparse = indices_sparse.smolyak_coefficient(k, d, t - np.dot(nu_dense, k), 0)
+            c_dense = indices_dense.smolyak_coefficient(k, t, nu=nu_dense)
             assert c_sparse == c_dense, (
                 f"Assertion failed for nu_sparse={nu_sparse}, c_sparse={c_sparse}"
                 + " and nu_dense={nu_dense}, c_dense={c_dense}"

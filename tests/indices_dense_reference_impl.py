@@ -25,5 +25,5 @@ def unitball(nu, k, t, e=None):
     return r
 
 
-def smolyak_coefficient_zeta(k, t, *, nu):
+def smolyak_coefficient(k, t, *, nu):
     return np.sum([(-1) ** (np.sum(e)) for e in unitball(nu, k, t)])
