@@ -71,7 +71,7 @@ class SmolyakBarycentricInterpolator:
         self.__init_nodes_and_weights()
 
         # Caching the interpolation node for nu = (0,0,...,0) for reuse in self.set_f
-        self.__zero = node_gen.get_zero()
+        self.__zero = np.array([g(0)[0] for g in self.__node_gen])
 
         self.__compiledfuncs = {}
 

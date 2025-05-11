@@ -40,9 +40,6 @@ class Generator(ABC):
     @abstractmethod
     def get_random(self, n: int = 1) -> Union[jax.Array, np.ndarray]: ...
 
-    def get_zero(self) -> Union[jax.Array, np.ndarray]:
-        return self(0)[0]
-
     @abstractmethod
     def __repr__(self) -> str: ...
 
@@ -60,9 +57,6 @@ class GeneratorMultiD(Generator):
 
     def __getitem__(self, i: int) -> Generator:
         return self.__gens[i]
-
-    def get_zero(self) -> Union[jax.Array, np.ndarray]:
-        return np.array([g(0)[0] for g in self.__gens])
 
     def get_random(self, n: int = 0) -> Union[jax.Array, np.ndarray]:
         if n == 0:
