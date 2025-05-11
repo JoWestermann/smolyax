@@ -10,36 +10,36 @@ from .base import Generator, GeneratorMultiD
 class Leja1D(Generator):
     """Leja grid points"""
 
-    nodes = np.array([0, 1, -1, 1 / np.sqrt(2), -1 / np.sqrt(2)])
+    __nodes = np.array([0, 1, -1, 1 / np.sqrt(2), -1 / np.sqrt(2)])
 
     def __init__(self, domain: Union[jax.Array, np.ndarray, Sequence[float]] = None) -> None:
         super().__init__(dim=1, is_nested=True)
-        self.domain = domain
-        self._reference_domain = None
+        self.__domain = domain
+        self.__reference_domain = None
         if domain is not None:
-            self.domain = np.asarray(domain)
-            self._reference_domain = (-1, 1)
+            self.__domain = np.asarray(domain)
+            self.__reference_domain = (-1, 1)
         self.__cached_scaled_call = self.__make_cached_scaled_call()
 
     def __repr__(self) -> str:
-        return f"Leja (domain = {self.domain})"
+        return f"Leja (domain = {self.__domain})"
 
     @classmethod
-    def _ensure_nodes(cls, n: int):
-        k = cls.nodes.shape[0]
+    def __ensure_nodes(cls, n: int):
+        k = cls.__nodes.shape[0]
         if n >= k:
-            cls.nodes = np.append(cls.nodes, np.empty((n + 1 - k,)))
+            cls.__nodes = np.append(cls.__nodes, np.empty((n + 1 - k,)))
             for j in range(k, n + 1):
                 if j % 2 == 0:
-                    cls.nodes[j] = -cls.nodes[j - 1]
+                    cls.__nodes[j] = -cls.__nodes[j - 1]
                 else:
-                    cls.nodes[j] = np.sqrt((cls.nodes[int((j + 1) / 2)] + 1) / 2)
+                    cls.__nodes[j] = np.sqrt((cls.__nodes[int((j + 1) / 2)] + 1) / 2)
 
     def __make_cached_scaled_call(self):
         @lru_cache(maxsize=None)
         def cached(n):
-            self._ensure_nodes(n)
-            return self.scale(self.nodes[: n + 1])
+            self.__ensure_nodes(n)
+            return self.scale(self.__nodes[: n + 1])
 
         return cached
 
@@ -58,9 +58,9 @@ class Leja1D(Generator):
         d1, d2 : arrays or lists of shape (2, )
         """
         if d1 is None:
-            d1 = self._reference_domain
+            d1 = self.__reference_domain
         if d2 is None:
-            d2 = self.domain
+            d2 = self.__domain
 
         assert (d1 is None) == (d2 is None)
         if d1 is None:  # no scaling if no custom domains are give
@@ -91,7 +91,7 @@ class Leja1D(Generator):
         return x.reshape(x_shape)
 
     def scale_back(self, x: Union[jax.Array, np.ndarray]) -> Union[jax.Array, np.ndarray]:
-        return self.scale(x, d1=self.domain, d2=self._reference_domain)
+        return self.scale(x, d1=self.__domain, d2=self.__reference_domain)
 
     def get_random(self, n: int = 1):
         return self.scale(np.random.uniform(-1, 1, n))
@@ -105,25 +105,25 @@ class Leja(GeneratorMultiD):
         domains: list[Union[jax.Array, np.ndarray, Sequence[float]]] = None,
         dim: int = None,
     ):
-        self.domains = None
-        self._reference_domains = None
+        self.__domains = None
+        self.__reference_domains = None
         if domains is not None:
             GeneratorMultiD.__init__(self, [Leja1D(domain) for domain in domains])
-            self.domains = np.asarray(domains)
-            self._reference_domains = np.array([[-1, 1]] * len(domains))
+            self.__domains = np.asarray(domains)
+            self.__reference_domains = np.array([[-1, 1]] * len(domains))
         elif dim is not None:
             GeneratorMultiD.__init__(self, [Leja1D() for _ in range(dim)])
         else:
             raise
 
     def __repr__(self) -> str:
-        if self.domains is not None:
-            return f"Leja (d = {self.dim}, domains = {self.domains.tolist()})"
+        if self.__domains is not None:
+            return f"Leja (d = {self.dim}, domains = {self.__domains.tolist()})"
         else:
             return f"Leja (d = {self.dim})"
 
     def scale_back(self, x: Union[jax.Array, np.ndarray]) -> Union[jax.Array, np.ndarray]:
-        return self.scale(x, d1=self.domains, d2=self._reference_domains)
+        return self.scale(x, d1=self.__domains, d2=self.__reference_domains)
 
     def scale(
         self,
@@ -137,9 +137,9 @@ class Leja(GeneratorMultiD):
         d1, d2 : arrays or lists of shape (d, 2)
         """
         if d1 is None:
-            d1 = self._reference_domains
+            d1 = self.__reference_domains
         if d2 is None:
-            d2 = self.domains
+            d2 = self.__domains
 
         assert (d1 is None) == (d2 is None)
         if d1 is None:  # no scaling if no custom domains are given
