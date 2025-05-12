@@ -1,7 +1,7 @@
 import numpy as np
 import setup
 
-from jax_smolyak.smolyak import SmolyakBarycentricInterpolator
+from smolyax.interpolation import SmolyakBarycentricInterpolator
 
 
 def test_smolyak_jax():

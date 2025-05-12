@@ -4,7 +4,7 @@ import indices_dense_reference_impl as indices_dense
 import numpy as np
 import setup
 
-from jax_smolyak import indices as indices_sparse
+from smolyax import indices as indices_sparse
 
 
 def get_random_indexsets(nested: bool = False):

@@ -3,7 +3,7 @@ import sys
 import numpy as np
 import pytest
 
-from jax_smolyak import indices
+from smolyax import indices
 
 
 @pytest.mark.parametrize(

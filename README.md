@@ -1,4 +1,4 @@
-# jax_smolyak
+# Smolyax
 
 A JAX-based package for Smolyak interpolation.
 

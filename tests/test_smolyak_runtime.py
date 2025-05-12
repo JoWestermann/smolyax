@@ -1,7 +1,8 @@
 import numpy as np
 import pytest
 
-from jax_smolyak import indices, nodes, smolyak
+from smolyax import indices, nodes
+from smolyax.interpolation import SmolyakBarycentricInterpolator
 
 
 def setup_nodes(d: int, node_type: str, default_domain: bool) -> nodes.Generator:
@@ -59,7 +60,7 @@ def test_smolyak_constructor_runtime(benchmark, d, m, node_type, default_domain)
     node_gen = setup_nodes(d, node_type, default_domain)
     k = np.log([2 + i for i in range(d)]) / np.log(2)
     t = indices.find_approximate_threshold(k, m, node_gen.is_nested)
-    benchmark(lambda: smolyak.SmolyakBarycentricInterpolator(node_gen=node_gen, k=k, t=t, d_out=10))
+    benchmark(lambda: SmolyakBarycentricInterpolator(node_gen=node_gen, k=k, t=t, d_out=10))
 
 
 def target_f(x, theta, r):
@@ -84,7 +85,7 @@ def test_smolyak_set_f_runtime(benchmark, d, m, node_type, default_domain):
     k = np.log([2 + i for i in range(d)]) / np.log(2)
     t = indices.find_approximate_threshold(k, m, node_gen.is_nested)
     f = lambda x: target_f(x, 2.0, 2.0)
-    benchmark(lambda: smolyak.SmolyakBarycentricInterpolator(node_gen=node_gen, k=k, t=t, d_out=1, f=f))
+    benchmark(lambda: SmolyakBarycentricInterpolator(node_gen=node_gen, k=k, t=t, d_out=1, f=f))
 
 
 @pytest.mark.parametrize(
@@ -105,6 +106,6 @@ def test_smolyak_eval(benchmark, d, m, node_type, default_domain):
     k = np.log([2 + i for i in range(d)]) / np.log(2)
     t = indices.find_approximate_threshold(k, m, node_gen.is_nested)
     f = lambda x: target_f(x, 2.0, 2.0)
-    smol = smolyak.SmolyakBarycentricInterpolator(node_gen=node_gen, k=k, t=t, d_out=1, f=f)
+    smol = SmolyakBarycentricInterpolator(node_gen=node_gen, k=k, t=t, d_out=1, f=f)
     x = np.random.randn(250, 1)
     benchmark(lambda: smol(x))

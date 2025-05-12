@@ -1,5 +1,5 @@
 ---
-title: 'jax-smolyak: a high-performance implementation of the Smolyak interpolation operator'
+title: 'smolyax: a high-performance implementation of the Smolyak interpolation operator'
 tags:
   - Python
   - JAX
@@ -46,11 +46,11 @@ header-includes:
 
 # Summary
 
-The `jax-smolyak` library provides interpolation capabilities for arbitrary multivariate and vector-valued functions $f : \mathbb{R}^{d_1} \to \mathbb{R}^{d_2}$ for any $d_1, d_2 \in \mathbb{N}$.
+The `smolyax` library provides interpolation capabilities for arbitrary multivariate and vector-valued functions $f : \mathbb{R}^{d_1} \to \mathbb{R}^{d_2}$ for any $d_1, d_2 \in \mathbb{N}$.
 
-It implements the Smolyak interpolation operator, which is known to overcome the curse-of-dimensionality plaguing naive multivariate interpolation [@barthelmann:2000]. The implementation is based on JAX [@jax:2018], a free and open-source Python library for high-performance computing that integrates seamlessly with the Python ecosystem. Thanks to JAX's device management, `jax-smolyak` runs natively on both CPU and GPU. While implementing Smolyak interpolation in JAX is challenging due to the highly irregular data structures involved, `jax-smolyak` overcomes this by employing a tailored batching and padding strategy (described below), enabling efficient vectorization, scalability, and parallel execution.
+It implements the Smolyak interpolation operator, which is known to overcome the curse-of-dimensionality plaguing naive multivariate interpolation [@barthelmann:2000]. The implementation is based on JAX [@jax:2018], a free and open-source Python library for high-performance computing that integrates seamlessly with the Python ecosystem. Thanks to JAX's device management, `smolyax` runs natively on both CPU and GPU. While implementing Smolyak interpolation in JAX is challenging due to the highly irregular data structures involved, `smolyax` overcomes this by employing a tailored batching and padding strategy (described below), enabling efficient vectorization, scalability, and parallel execution.
 
-`jax-smolyak` supports sparse grid [@bungartz:2004] interpolation nodes based on either Leja [@chkifa:2013] or Gauss-Hermite
+`smolyax` supports sparse grid [@bungartz:2004] interpolation nodes based on either Leja [@chkifa:2013] or Gauss-Hermite
 [@abramowitz:1964] node sequences and characterized by $\bsk$-weighted anisotropic multi-index sets
 $$
 \Lambda_{\bsk, t} := \{\bsnu \in \mathbb{N}_0^{d_1} : \sum_{j=1}^{d_1} k_j \nu_j < t\},
@@ -63,7 +63,7 @@ Polynomial expansion is a well-studied and powerful tool in applied mathematics,
 
 Smolyak interpolation offers a practical way to construct polynomial approximations with known error bounds for a wide range of function classes, see e.g. [@barthelmann:2000; @chkifa:2015].
 
-While several libraries provide high-dimensional interpolation functionality, none, to our knowledge, provides a hardware-agnostic, high performance implementation. `jax-smolyak` addresses this gap by providing an efficient solution within the popular JAX ecosystem.
+While several libraries provide high-dimensional interpolation functionality, none, to our knowledge, provides a hardware-agnostic, high performance implementation. `smolyax` addresses this gap by providing an efficient solution within the popular JAX ecosystem.
 
 # High-dimensional interpolation with the Smolyak operator
 
