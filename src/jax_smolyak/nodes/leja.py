@@ -8,11 +8,19 @@ from .base import Generator, GeneratorMultiD
 
 
 class Leja1D(Generator):
-    """Leja grid points"""
+    """A generator for Leja points, a nested sequence on a closed one-dimensional domain."""
 
     __nodes = np.array([0, 1, -1, 1 / np.sqrt(2), -1 / np.sqrt(2)])
 
     def __init__(self, domain: Union[jax.Array, np.ndarray, Sequence[float]] = None) -> None:
+        """
+        Initialize the one-dimensional Leja node generator.
+
+        Parameters
+        ----------
+        domain : Union[jax.Array, np.ndarray, Sequence[float]], optional
+            Endpoints of the domain. Defaults to `[-1, 1]` if not specified.
+        """
         super().__init__(dim=1, is_nested=True)
         self.__domain = domain
         self.__reference_domain = None
@@ -98,6 +106,7 @@ class Leja1D(Generator):
 
 
 class Leja(GeneratorMultiD):
+    """Multidimensional Leja node generator."""
 
     def __init__(
         self,
@@ -105,6 +114,23 @@ class Leja(GeneratorMultiD):
         domains: list[Union[jax.Array, np.ndarray, Sequence[float]]] = None,
         dim: int = None,
     ):
+        """
+        Initialize the multidimensional Leja node generator.
+
+        Parameters
+        ----------
+        domains : list of Union[jax.Array, np.ndarray, Sequence[float]], optional
+            List of 1D domains (each as a 2-element sequence) for each dimension.
+            If provided, `dim` must be None.
+        dim : int, optional
+            The number of dimensions. If provided without `domains`, uses `[-1, 1]`
+            as the default domain in each dimension.
+
+        Raises
+        ------
+        ValueError
+            If the dimension cannot be inferred from inputs.
+        """
         self.__domains = None
         self.__reference_domains = None
         if domains is not None:
@@ -114,7 +140,7 @@ class Leja(GeneratorMultiD):
         elif dim is not None:
             GeneratorMultiD.__init__(self, [Leja1D() for _ in range(dim)])
         else:
-            raise
+            raise ValueError("Must specify one of 'domains' or 'dim'.")
 
     def __repr__(self) -> str:
         if self.__domains is not None:

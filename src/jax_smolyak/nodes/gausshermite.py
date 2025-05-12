@@ -8,9 +8,19 @@ from .base import Generator, GeneratorMultiD
 
 
 class GaussHermite1D(Generator):
-    """Gauss-Hermite grid points"""
+    """Generator for Gauss-Hermite points, a non-nested node sequence on the real line."""
 
-    def __init__(self, mean: float, scaling: float) -> None:
+    def __init__(self, mean: float = 0.0, scaling: float = 1.0) -> None:
+        """
+        Initialize the one-dimensional Gauss-Hermite node generator.
+
+        Parameters
+        ----------
+        mean : float, optional
+            Center of the node sequence. Default is 0.0.
+        scaling : float, optional
+            Scaling of the node sequence. Default is 1.0.
+        """
         super().__init__(dim=1, is_nested=False)
         self.__mean = mean
         self.__scaling = scaling
@@ -40,10 +50,28 @@ class GaussHermite1D(Generator):
 
 
 class GaussHermite(GeneratorMultiD):
+    """Multidimensional Gauss-Hermite node generator."""
 
     def __init__(
         self, mean: Union[jax.Array, np.ndarray] = None, scaling: Union[jax.Array, np.ndarray] = None, dim: int = None
     ):
+        """
+        Initialize the multidimensional Gauss-Hermite node generator.
+
+        Parameters
+        ----------
+        mean : Union[jax.Array, np.ndarray], optional
+            Node sequence centers for each dimension. Defaults to zeros.
+        scaling : Union[jax.Array, np.ndarray], optional
+            Node sequence scalings for each dimension. Defaults to ones.
+        dim : int, optional
+            Number of dimensions. Only required if neither `mean` nor `scaling` is provided.
+
+        Raises
+        ------
+        ValueError
+            If the dimension cannot be inferred from inputs.
+        """
         dim = dim
         if dim is None:
             if scaling is not None:
@@ -51,7 +79,7 @@ class GaussHermite(GeneratorMultiD):
             elif mean is not None:
                 dim = len(mean)
             else:
-                raise
+                raise ValueError("Must specify at least one of 'dim', 'mean', or 'scaling'.")
 
         if mean is None:
             mean = np.zeros(dim)

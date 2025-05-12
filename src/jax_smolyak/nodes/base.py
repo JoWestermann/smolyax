@@ -6,18 +6,34 @@ import numpy as np
 
 
 class Generator(ABC):
-    """Abstract base class for univariate interpolation points"""
+    """Abstract base class for one-dimensional interpolation nodes"""
 
     def __init__(self, dim: int, is_nested: bool) -> None:
+        """
+        Initialize the generator.
+
+        Parameters
+        ----------
+        dim : int
+            Dimensionality of the generator.
+        is_nested : bool
+            Indicates if the node sequence is nested.
+        """
         self.__dim = dim
         self.__is_nested = is_nested
 
     @property
     def is_nested(self) -> bool:
+        """
+        `True` if the node sequence is nested, `False` otherwise.
+        """
         return self.__is_nested
 
     @property
     def dim(self) -> int:
+        """
+        Dimensionality of the generator.
+        """
         return self.__dim
 
     @abstractmethod
@@ -45,7 +61,7 @@ class Generator(ABC):
 
 
 class GeneratorMultiD(Generator):
-    """Abstract base class for multivariate interpolation points"""
+    """Abstract base class for multidimensional interpolation nodes"""
 
     def __init__(self, node_gens: List[Generator]):
         assert all(g.is_nested == node_gens[0].is_nested for g in node_gens)
