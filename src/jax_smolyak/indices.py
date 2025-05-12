@@ -5,7 +5,7 @@ $\Lambda_{\boldsymbol{k}, t}$ and related data structures and quantities.
 For a given weight vector $\boldsymbol{k} \in \mathbb{R}^d$ the anisotropic multi-index set
 $\Lambda_{\boldsymbol{k}, t} \subset \mathbb{N}_0^d$ is defined as
 $$
-\Lambda_{\boldsymbol{k}, t} := \\{\boldsymbol{\nu} \in \mathbb{N}_0^{d_1} \ : \ \sum_{j=1}^{d_1} k_j \nu_j < t\\}.
+\Lambda_{\boldsymbol{k}, t} := \\{\boldsymbol{\nu} \in \mathbb{N}_0^{d} \ : \ \sum_{j=1}^{d} k_j \nu_j < t\\}.
 $$
 where $t > 0$ is a scalar threshold parameter that allows to control the size of the multi-index set.
 """

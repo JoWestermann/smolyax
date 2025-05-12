@@ -11,7 +11,7 @@ def setup_nodes(d: int, node_type: str, default_domain: bool) -> nodes.Generator
     Parameters
     ----------
     d : int
-        The dimensionof the domain.
+        The dimension of the domain.
     node_type : str
         The type of nodes to set up. Must be one of {'leja', 'gauss'}.
     default_domain : bool
