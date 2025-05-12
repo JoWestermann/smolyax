@@ -76,30 +76,32 @@
 
                         <label class="view-source-button" for="mod-barycentric-view-source"><span>View Source</span></label>
 
-                        <div class="pdoc-code codehilite"><pre><span></span><span id="L-1"><a href="#L-1"><span class="linenos"> 1</span></a><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
-</span><span id="L-2"><a href="#L-2"><span class="linenos"> 2</span></a><span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
-</span><span id="L-3"><a href="#L-3"><span class="linenos"> 3</span></a><span class="kn">from</span><span class="w"> </span><span class="nn">jax.typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">ArrayLike</span>
-</span><span id="L-4"><a href="#L-4"><span class="linenos"> 4</span></a>
-</span><span id="L-5"><a href="#L-5"><span class="linenos"> 5</span></a>
-</span><span id="L-6"><a href="#L-6"><span class="linenos"> 6</span></a><span class="nd">@jax</span><span class="o">.</span><span class="n">jit</span>
-</span><span id="L-7"><a href="#L-7"><span class="linenos"> 7</span></a><span class="k">def</span><span class="w"> </span><span class="nf">compute_weights</span><span class="p">(</span><span class="n">nodes</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
-</span><span id="L-8"><a href="#L-8"><span class="linenos"> 8</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="L-9"><a href="#L-9"><span class="linenos"> 9</span></a><span class="sd">    Compute the barycentric interpolation weights corresponding to given nodes.</span>
-</span><span id="L-10"><a href="#L-10"><span class="linenos">10</span></a>
-</span><span id="L-11"><a href="#L-11"><span class="linenos">11</span></a><span class="sd">    Parameters</span>
-</span><span id="L-12"><a href="#L-12"><span class="linenos">12</span></a><span class="sd">    ----------</span>
-</span><span id="L-13"><a href="#L-13"><span class="linenos">13</span></a><span class="sd">    nodes : ArrayLike</span>
-</span><span id="L-14"><a href="#L-14"><span class="linenos">14</span></a><span class="sd">        A 1D array of shape (n,) containing n one-dimensional interpolation nodes.</span>
-</span><span id="L-15"><a href="#L-15"><span class="linenos">15</span></a>
-</span><span id="L-16"><a href="#L-16"><span class="linenos">16</span></a><span class="sd">    Returns</span>
-</span><span id="L-17"><a href="#L-17"><span class="linenos">17</span></a><span class="sd">    -------</span>
-</span><span id="L-18"><a href="#L-18"><span class="linenos">18</span></a><span class="sd">    ArrayLike</span>
-</span><span id="L-19"><a href="#L-19"><span class="linenos">19</span></a><span class="sd">        The corresponding barycentric interpolation weights.</span>
-</span><span id="L-20"><a href="#L-20"><span class="linenos">20</span></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="L-21"><a href="#L-21"><span class="linenos">21</span></a>    <span class="n">nodes</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
-</span><span id="L-22"><a href="#L-22"><span class="linenos">22</span></a>    <span class="n">diffs</span> <span class="o">=</span> <span class="n">nodes</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">-</span> <span class="n">nodes</span>
-</span><span id="L-23"><a href="#L-23"><span class="linenos">23</span></a>    <span class="n">diffs</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">diffs</span> <span class="o">==</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">diffs</span><span class="p">)</span>
-</span><span id="L-24"><a href="#L-24"><span class="linenos">24</span></a>    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="n">diffs</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+                        <div class="pdoc-code codehilite"><pre><span></span><span id="L-1"><a href="#L-1"><span class="linenos"> 1</span></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Union</span>
+</span><span id="L-2"><a href="#L-2"><span class="linenos"> 2</span></a>
+</span><span id="L-3"><a href="#L-3"><span class="linenos"> 3</span></a><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
+</span><span id="L-4"><a href="#L-4"><span class="linenos"> 4</span></a><span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+</span><span id="L-5"><a href="#L-5"><span class="linenos"> 5</span></a><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+</span><span id="L-6"><a href="#L-6"><span class="linenos"> 6</span></a>
+</span><span id="L-7"><a href="#L-7"><span class="linenos"> 7</span></a>
+</span><span id="L-8"><a href="#L-8"><span class="linenos"> 8</span></a><span class="nd">@jax</span><span class="o">.</span><span class="n">jit</span>
+</span><span id="L-9"><a href="#L-9"><span class="linenos"> 9</span></a><span class="k">def</span><span class="w"> </span><span class="nf">compute_weights</span><span class="p">(</span><span class="n">nodes</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+</span><span id="L-10"><a href="#L-10"><span class="linenos">10</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="L-11"><a href="#L-11"><span class="linenos">11</span></a><span class="sd">    Compute the barycentric interpolation weights corresponding to given nodes.</span>
+</span><span id="L-12"><a href="#L-12"><span class="linenos">12</span></a>
+</span><span id="L-13"><a href="#L-13"><span class="linenos">13</span></a><span class="sd">    Parameters</span>
+</span><span id="L-14"><a href="#L-14"><span class="linenos">14</span></a><span class="sd">    ----------</span>
+</span><span id="L-15"><a href="#L-15"><span class="linenos">15</span></a><span class="sd">    nodes : Union[jax.Array, np.ndarray]</span>
+</span><span id="L-16"><a href="#L-16"><span class="linenos">16</span></a><span class="sd">        A 1D array of shape (n,) containing n one-dimensional interpolation nodes.</span>
+</span><span id="L-17"><a href="#L-17"><span class="linenos">17</span></a>
+</span><span id="L-18"><a href="#L-18"><span class="linenos">18</span></a><span class="sd">    Returns</span>
+</span><span id="L-19"><a href="#L-19"><span class="linenos">19</span></a><span class="sd">    -------</span>
+</span><span id="L-20"><a href="#L-20"><span class="linenos">20</span></a><span class="sd">    jax.Array</span>
+</span><span id="L-21"><a href="#L-21"><span class="linenos">21</span></a><span class="sd">        The corresponding barycentric interpolation weights.</span>
+</span><span id="L-22"><a href="#L-22"><span class="linenos">22</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="L-23"><a href="#L-23"><span class="linenos">23</span></a>    <span class="n">nodes</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
+</span><span id="L-24"><a href="#L-24"><span class="linenos">24</span></a>    <span class="n">diffs</span> <span class="o">=</span> <span class="n">nodes</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">-</span> <span class="n">nodes</span>
+</span><span id="L-25"><a href="#L-25"><span class="linenos">25</span></a>    <span class="n">diffs</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">diffs</span> <span class="o">==</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">diffs</span><span class="p">)</span>
+</span><span id="L-26"><a href="#L-26"><span class="linenos">26</span></a>    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="n">diffs</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 </span></pre></div>
 
 
@@ -110,31 +112,31 @@
                     <div class="decorator decorator-jax.jit">@jax.jit</div>
 
         <span class="def">def</span>
-        <span class="name">compute_weights</span><span class="signature pdoc-code multiline">(<span class="param">	<span class="n">nodes</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">bool</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">number</span><span class="p">,</span> <span class="nb">bool</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">complex</span><span class="p">]</span></span><span class="return-annotation">) -> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>:</span></span>
+        <span class="name">compute_weights</span><span class="signature pdoc-code condensed">(<span class="param"><span class="n">nodes</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span></span><span class="return-annotation">) -> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>:</span></span>
 
                 <label class="view-source-button" for="compute_weights-view-source"><span>View Source</span></label>
 
     </div>
     <a class="headerlink" href="#compute_weights"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="compute_weights-7"><a href="#compute_weights-7"><span class="linenos"> 7</span></a><span class="nd">@jax</span><span class="o">.</span><span class="n">jit</span>
-</span><span id="compute_weights-8"><a href="#compute_weights-8"><span class="linenos"> 8</span></a><span class="k">def</span><span class="w"> </span><span class="nf">compute_weights</span><span class="p">(</span><span class="n">nodes</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
-</span><span id="compute_weights-9"><a href="#compute_weights-9"><span class="linenos"> 9</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="compute_weights-10"><a href="#compute_weights-10"><span class="linenos">10</span></a><span class="sd">    Compute the barycentric interpolation weights corresponding to given nodes.</span>
-</span><span id="compute_weights-11"><a href="#compute_weights-11"><span class="linenos">11</span></a>
-</span><span id="compute_weights-12"><a href="#compute_weights-12"><span class="linenos">12</span></a><span class="sd">    Parameters</span>
-</span><span id="compute_weights-13"><a href="#compute_weights-13"><span class="linenos">13</span></a><span class="sd">    ----------</span>
-</span><span id="compute_weights-14"><a href="#compute_weights-14"><span class="linenos">14</span></a><span class="sd">    nodes : ArrayLike</span>
-</span><span id="compute_weights-15"><a href="#compute_weights-15"><span class="linenos">15</span></a><span class="sd">        A 1D array of shape (n,) containing n one-dimensional interpolation nodes.</span>
-</span><span id="compute_weights-16"><a href="#compute_weights-16"><span class="linenos">16</span></a>
-</span><span id="compute_weights-17"><a href="#compute_weights-17"><span class="linenos">17</span></a><span class="sd">    Returns</span>
-</span><span id="compute_weights-18"><a href="#compute_weights-18"><span class="linenos">18</span></a><span class="sd">    -------</span>
-</span><span id="compute_weights-19"><a href="#compute_weights-19"><span class="linenos">19</span></a><span class="sd">    ArrayLike</span>
-</span><span id="compute_weights-20"><a href="#compute_weights-20"><span class="linenos">20</span></a><span class="sd">        The corresponding barycentric interpolation weights.</span>
-</span><span id="compute_weights-21"><a href="#compute_weights-21"><span class="linenos">21</span></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="compute_weights-22"><a href="#compute_weights-22"><span class="linenos">22</span></a>    <span class="n">nodes</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
-</span><span id="compute_weights-23"><a href="#compute_weights-23"><span class="linenos">23</span></a>    <span class="n">diffs</span> <span class="o">=</span> <span class="n">nodes</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">-</span> <span class="n">nodes</span>
-</span><span id="compute_weights-24"><a href="#compute_weights-24"><span class="linenos">24</span></a>    <span class="n">diffs</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">diffs</span> <span class="o">==</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">diffs</span><span class="p">)</span>
-</span><span id="compute_weights-25"><a href="#compute_weights-25"><span class="linenos">25</span></a>    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="n">diffs</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="compute_weights-9"><a href="#compute_weights-9"><span class="linenos"> 9</span></a><span class="nd">@jax</span><span class="o">.</span><span class="n">jit</span>
+</span><span id="compute_weights-10"><a href="#compute_weights-10"><span class="linenos">10</span></a><span class="k">def</span><span class="w"> </span><span class="nf">compute_weights</span><span class="p">(</span><span class="n">nodes</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+</span><span id="compute_weights-11"><a href="#compute_weights-11"><span class="linenos">11</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="compute_weights-12"><a href="#compute_weights-12"><span class="linenos">12</span></a><span class="sd">    Compute the barycentric interpolation weights corresponding to given nodes.</span>
+</span><span id="compute_weights-13"><a href="#compute_weights-13"><span class="linenos">13</span></a>
+</span><span id="compute_weights-14"><a href="#compute_weights-14"><span class="linenos">14</span></a><span class="sd">    Parameters</span>
+</span><span id="compute_weights-15"><a href="#compute_weights-15"><span class="linenos">15</span></a><span class="sd">    ----------</span>
+</span><span id="compute_weights-16"><a href="#compute_weights-16"><span class="linenos">16</span></a><span class="sd">    nodes : Union[jax.Array, np.ndarray]</span>
+</span><span id="compute_weights-17"><a href="#compute_weights-17"><span class="linenos">17</span></a><span class="sd">        A 1D array of shape (n,) containing n one-dimensional interpolation nodes.</span>
+</span><span id="compute_weights-18"><a href="#compute_weights-18"><span class="linenos">18</span></a>
+</span><span id="compute_weights-19"><a href="#compute_weights-19"><span class="linenos">19</span></a><span class="sd">    Returns</span>
+</span><span id="compute_weights-20"><a href="#compute_weights-20"><span class="linenos">20</span></a><span class="sd">    -------</span>
+</span><span id="compute_weights-21"><a href="#compute_weights-21"><span class="linenos">21</span></a><span class="sd">    jax.Array</span>
+</span><span id="compute_weights-22"><a href="#compute_weights-22"><span class="linenos">22</span></a><span class="sd">        The corresponding barycentric interpolation weights.</span>
+</span><span id="compute_weights-23"><a href="#compute_weights-23"><span class="linenos">23</span></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="compute_weights-24"><a href="#compute_weights-24"><span class="linenos">24</span></a>    <span class="n">nodes</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
+</span><span id="compute_weights-25"><a href="#compute_weights-25"><span class="linenos">25</span></a>    <span class="n">diffs</span> <span class="o">=</span> <span class="n">nodes</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">-</span> <span class="n">nodes</span>
+</span><span id="compute_weights-26"><a href="#compute_weights-26"><span class="linenos">26</span></a>    <span class="n">diffs</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">diffs</span> <span class="o">==</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">diffs</span><span class="p">)</span>
+</span><span id="compute_weights-27"><a href="#compute_weights-27"><span class="linenos">27</span></a>    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="n">diffs</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 </span></pre></div>
 
 
@@ -143,14 +145,14 @@
 <h6 id="parameters">Parameters</h6>
 
 <ul>
-<li><strong>nodes</strong> (ArrayLike):
+<li><strong>nodes</strong> (Union[jax.Array, np.ndarray]):
 A 1D array of shape (n,) containing n one-dimensional interpolation nodes.</li>
 </ul>
 
 <h6 id="returns">Returns</h6>
 
 <ul>
-<li><strong>ArrayLike</strong>: The corresponding barycentric interpolation weights.</li>
+<li><strong>jax.Array</strong>: The corresponding barycentric interpolation weights.</li>
 </ul>
 </div>
 
