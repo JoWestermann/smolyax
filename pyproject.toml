@@ -3,7 +3,7 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "jax_smolyak"
+name = "smolyax"
 version = "0.1.0"
 description = "A JAX package for Smolyak interpolation"
 authors = [
@@ -39,7 +39,7 @@ extend-ignore = """E203"""
 
 [tool.pytype]
 python_version = "3.11"
-inputs = ["src/jax_smolyak"]
+inputs = ["src/smolyax"]
 disable = ["import-error"]
 
 [tool.setuptools.packages.find]
