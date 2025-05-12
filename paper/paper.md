@@ -14,12 +14,14 @@ authors:
     affiliation: 1
     corresponding: true
   - name: Joshua Chen
+    orcid: 0009-0002-2257-5780
     affiliation: 2
 affiliations:
  - name: Heidelberg University, Germany
    ror: 038t36y30
    index: 1
- - name: Institution Name, Country
+ - name: The University of Texas at Austin, USA
+   ror: 00hj54h04
    index: 2
 date: 28 February 2025
 bibliography: paper.bib
