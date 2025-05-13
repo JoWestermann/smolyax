@@ -2,14 +2,12 @@
 
 Fast interpolation of high-dimensional and vector-valued functions
 - avoiding the curse-of-dimensionality by using sparse-grid interpolation nodes, 
-- ensuring numerical stability by using a barycentric Smolyak interpolation formulation 
-and 
+- ensuring numerical stability by using a barycentric Smolyak interpolation formulation and 
 - providing hardware-agnostic high performance by implementing key algorithms in JAX.
 
 ### Features
-- Node sequences for interpolation on bounded or unbounded domains 
-(Leja nodes and Gauß-Hermite nodes, respectively)
-- General anisotropic multi-index sets $\Lambda \subset \mathbb{N}_{0}^{d}$ of the form 
+- Node sequences for interpolation on bounded or unbounded domains (Leja nodes and Gauß-Hermite nodes, respectively)
+- General anisotropic multi-index sets $\Lambda \subset \mathbb{N}^d_0$ of the form
 $\Lambda := \\{\boldsymbol{\nu} \in \mathbb{N}^d_0  \ : \ \sum_{j=1}^{d} k_j \nu_j < t \\}$
 where $\boldsymbol{k}\in \mathbb{R}^{d}$ is monotonically increasing and controls the anisotropy
 while the threshold $t > 0$ controls the cardinality of the set.
@@ -99,7 +97,7 @@ If you used this library for your research, please cite [the paper]():
 
 ```
 @article{westermann2025smolyax
-  title={Measure transport via polynomial density surrogates},
+  title={smolyax: a high-performance implementation of the Smolyak interpolation operator},
   author={Westermann, Josephine and Chen, Joshua},
   journal={tba},
   year={2025},
