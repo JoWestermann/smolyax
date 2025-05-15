@@ -1,13 +1,12 @@
 ---
 title: 'smolyax: a high-performance implementation of the Smolyak interpolation operator in JAX'
 tags:
-  - Python
-  - JAX
-  - Interpolation
-  - HPC
-  - Smolyak
+  - Polynomial Interpolation
+  - Smolyak Operator
   - Sparse Grids
   - Polynomial Chaos
+  - JAX
+  - Numba
 authors:
   - name: Josephine Westermann
     orcid: 0000-0003-3450-9166
