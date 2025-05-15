@@ -1,5 +1,5 @@
 ---
-title: 'smolyax: a high-performance implementation of the Smolyak interpolation operator'
+title: 'smolyax: a high-performance implementation of the Smolyak interpolation operator in JAX'
 tags:
   - Python
   - JAX
