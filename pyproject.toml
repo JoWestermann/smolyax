@@ -7,7 +7,7 @@ name = "smolyax"
 version = "1.0.0"
 description = "A JAX package for Smolyak interpolation"
 authors = [
-    { name = "Josephine Westermann", email = "xx@xx.com" },
+    { name = "Josephine Westermann" },
     { name = "Joshua Chen", email = "joshuawchen@icloud.com" }
 ]
 license = { text = "MIT" }
