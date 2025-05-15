@@ -30,7 +30,7 @@ class SmolyakBarycentricInterpolator:
         self,
         *,
         node_gen: nodes.Generator,
-        k: Union[jax.Array, np.ndarray],
+        k: Sequence[float],
         t: float,
         d_out: int,
         f: Callable[[Union[jax.Array, np.ndarray]], Union[jax.Array, np.ndarray]] = None,
@@ -78,7 +78,7 @@ class SmolyakBarycentricInterpolator:
         if f is not None:
             self.set_f(f=f, batchsize=batchsize)
 
-    def __init_indices_data(self, k: Union[jax.Array, np.ndarray], t: float):
+    def __init_indices_data(self, k: Sequence[float], t: float):
         self.n_2_nus, self.n_2_zetas = indices.non_zero_indices_and_zetas(k, t)
 
         # Tracking number of evaluations of the interpolation target f.

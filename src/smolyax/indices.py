@@ -119,7 +119,7 @@ def indexset_cardinality(k: Sequence[float], t: float) -> int:
 
 
 @njit(cache=True)
-def smolyak_coefficient(k: np.ndarray, d: int, rem_t: float, parity: int) -> int:
+def smolyak_coefficient(k: Sequence[float], d: int, rem_t: float, parity: int) -> int:
     r"""
     Computes the smolyak coefficient $\zeta_{\Lambda_{\boldsymbol{k},t}, \boldsymbol{\nu}} := \sum
     \limits_{\boldsymbol{e} \in \\{0,1\\}^d : \boldsymbol{\nu}+\boldsymbol{e} \in \Lambda_{\boldsymbol{k},t}}
