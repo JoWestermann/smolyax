@@ -56,7 +56,7 @@ It implements the Smolyak interpolation operator, which is known to overcome the
 
 # Statement of Need
 
-Polynomial expansion is a well-studied and powerful tool in applied mathematics, with important applications, for example, in surrogate modeling, uncertainty quantification and inverse problems, see e.g. [@adcock:2022; @dung:2023; @zech:2018; @chkifa:2015; @herrmann:2024; @westermann:2025] and references therein.
+Polynomial expansion is a well-studied and powerful tool in applied mathematics, with important applications in surrogate modeling, uncertainty quantification and inverse problems, see e.g. [@adcock:2022; @dung:2023; @zech:2018; @chkifa:2015; @herrmann:2024; @westermann:2025] and references therein.
 
 Smolyak interpolation offers a practical way to construct polynomial approximations with known error bounds for a wide range of function classes, see e.g. [@barthelmann:2000; @chkifa:2015].
 
@@ -64,7 +64,7 @@ While several libraries provide high-dimensional interpolation functionality, no
 
 # High-dimensional interpolation with the Smolyak operator
 
-We briefly summarize the essentials of high-dimensional interpolation, where sparse grids have become the standard choice for interpolation points. In this setting, the interpolation operator is commonly referred to as the Smolyak operator. This overview provides background and establishes notation, which will be used to describe our specific implementation choices in the next section. For ease of notation, the following discussions we will focus on scalar-valued interpolation targets (i.e., on the case $d_1 = d$ and $d_2 = 1$), while the extension to vector-valued functions follows straightforward by interpolating each output vector element individually.
+We briefly summarize the essentials of high-dimensional interpolation, where sparse grids have become the standard choice for interpolation points. In this setting, the interpolation operator is commonly referred to as the Smolyak operator. This overview provides background and establishes notation, which will be used to describe our specific implementation choices in the next section. For ease of notation, the following discussion will focus on scalar-valued interpolation targets (i.e., on the case $d_1 = d$ and $d_2 = 1$), while the extension to vector-valued functions follows straightforwardly by interpolating each element of the output vector individually.
 
 **Univariate interpolation.** Given a domain $D \subset \R$ and set of $\nu \in \N$ pairwise distinct interpolation points $(\xi^\nu_i)_{i=0}^\nu \subset D$, the polynomial interpolation operator $I^\nu : C^0(D) \to \bbP_\nu := {\rm span} \set{x^i}{i=0,\dots,\nu}$ maps a function $f : D \to \R$ onto the unique polynomial $I^\nu [f]$ of maximal degree $\nu$ such that $f(\xi^\nu_i) = I^\nu [f](\xi^\nu_i)$ for all $i\in\{0,1,\dots,\nu\}$.
 
@@ -106,7 +106,7 @@ and vectors $\bsb^{\nu_j} (x_j) \in \R^{\nu_j+1}$ given as
     I^\Lambda := \sum \limits_{\bsnu \in \Lambda} \zeta_{\Lambda, \bsnu} I^\bsnu, \qquad \zeta_{\Lambda, \bsnu} := \sum \limits_{\bse \in \{0,1\}^d : \bsnu+\bse \in \Lambda} (-1)^{|\bse|}.
 \end{equation}
 
-# Vectorizable implementation of the Smolyak operator for HPC
+# A vectorizable implementation of the Smolyak operator
 
 To leverage key HPC techniques such as vectorization, parallelization, and batch processing, input data must conform to a uniform structure. However, the vectors and tensors in \eqref{eq:ip_smolyak} together with \eqref{eq:ip_tensorproduct} can exhibit a wide range of shapes, posing a challenge for efficient vectorization. A naive approach would be to zero-pad all tensors $\bsF^\bsnu$ in \eqref{eq:ip_smolyak} to the smallest possible common shape $(\max_{\bsnu \in \Lambda}(\nu_j))_{j=1}^d$. This approach, however, suffers from the curse-of-dimensionality, as memory requirements grow exponentially with $d$. With our implementation we navigate in between these two extremes of handling a large number of small tensors and a single, massive tensor. The key idea is to set up all tensors by:
 \begin{itemize}
@@ -160,7 +160,7 @@ We write $I^{\bsnu, s, \bstau}$ when applying \eqref{eq:ip_truncating} and \eqre
 We now have everything in place to construct the Smolyak interpolant in a form that is well-suited for vectorized execution. Algorithm \ref{alg:smolyak} outlines the key steps. Given a downward-closed but otherwise arbitrarily structured multi-index set $\Lambda$ and a target function $f$, we begin by identifying the subset $\Lambda_\zeta$ of multi-indices $\bsnu$ with nonzero Smolyak coefficients $\zeta_{\Lambda, \bsnu}$ and determining the maximal number $N \le d$ of nonzero entries across these multi-indices. Notably, $N$ remains small (typically single-digit) even when the dimensionality $d$ reaches the hundreds and $|\Lambda|$ is on the order of tens of thousands. For each fixed sparsity level $n \in [0, \dots, N]$, we extract the subset $\Lambda_n$ of multi-indices with exactly $n$ nonzero entries and determine the minimal bounding multi-index $\bstau \in \mathbb{N}_0^n$ such that $\bsnu^s \leq \bstau$ for all $\bsnu \in \Lambda_n$. This step ensures that all the tensorized interpolation operators $(I^\bsnu)_{\bsnu \in \Lambda_n}$ can be efficiently assembled into a single, vectorized computation. In Algorithm \ref{alg:smolyak}, this is compactly expressed as the summation of all $(I^{\bsnu, s, \bstau})_{\bsnu \in \Lambda_n}$, but in practice, it corresponds to pre-allocating and incrementally populating large arrays for interpolation nodes, weights, and function values. The final interpolant $I^\Lambda$ is then assembled through a brief loop over a small number of high-throughput operations, ensuring computational efficiency.
 
 \begin{algorithm}[H]
-  \caption{Construct the multivariate barycentric Smolyak interpolator $I^\Lambda$\\
+  \caption{Construct the barycentric Smolyak interpolator $I^\Lambda$\\
     \textit{Input:} Target function $f$, multi-index set $\Lambda \subset \N_0^d$\\
     \textit{Output:} $I^\Lambda$} \label{alg:smolyak}
   \begin{algorithmic}[1]
@@ -180,8 +180,6 @@ We now have everything in place to construct the Smolyak interpolant in a form t
     \Return $I^\Lambda$
   \end{algorithmic}
 \end{algorithm}
-
-While the previous discussion focused on scalar-valued interpolation targets (i.e., the case $d_2 = 1$), the extension to vector-valued functions is straightforward and works seamlessly, provided that all interpolants in the codomain are constructed using the same multi-index set $\Lambda$.
 
 # Acknowledgements
 
