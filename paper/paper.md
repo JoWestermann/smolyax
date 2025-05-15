@@ -14,12 +14,14 @@ authors:
     affiliation: 1
     corresponding: true
   - name: Joshua Chen
+    orcid: 0009-0002-2257-5780
     affiliation: 2
 affiliations:
  - name: Heidelberg University, Germany
    ror: 038t36y30
    index: 1
- - name: Institution Name, Country
+ - name: The University of Texas at Austin, USA
+   ror: 00hj54h04
    index: 2
 date: 28 February 2025
 bibliography: paper.bib
@@ -48,7 +50,7 @@ header-includes:
 
 The `smolyax` library provides interpolation capabilities for arbitrary multivariate and vector-valued functions $f : \mathbb{R}^{d_1} \to \mathbb{R}^{d_2}$ for any $d_1, d_2 \in \mathbb{N}$.
 
-It implements the Smolyak interpolation operator, which is known to overcome the curse-of-dimensionality plaguing naive multivariate interpolation [@barthelmann:2000]. The implementation is based on JAX [@jax:2018], a free and open-source Python library for high-performance computing that integrates seamlessly with the Python ecosystem. Thanks to JAX's device management, `smolyax` runs natively on both CPU and GPU. While implementing Smolyak interpolation in JAX is challenging due to the highly irregular data structures involved, `smolyax` overcomes this by employing a tailored batching and padding strategy (described below), enabling efficient vectorization, scalability, and parallel execution.
+It implements the Smolyak interpolation operator, which is known to overcome the curse-of-dimensionality plaguing naive multivariate interpolation [@barthelmann:2000]. The implementation is based on JAX [@jax:2018], a free and open-source Python library for high-performance computing that integrates nearly seamlessly with the Python numpy numerical computing ecosystem. Thanks to JAX's device management, `smolyax` runs natively on both CPU and GPU. While implementing Smolyak interpolation in JAX is challenging due to the highly irregular data structures involved, `smolyax` overcomes this by employing a tailored batching and padding strategy (described below), enabling efficient vectorization, scalability, and parallel execution.
 
 `smolyax` supports sparse grid [@bungartz:2004] interpolation nodes based on either Leja [@chkifa:2013] or Gauss-Hermite
 [@abramowitz:1964] node sequences and characterized by $\bsk$-weighted anisotropic multi-index sets
