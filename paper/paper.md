@@ -50,14 +50,9 @@ header-includes:
 
 The `smolyax` library provides interpolation capabilities for arbitrary multivariate and vector-valued functions $f : \mathbb{R}^{d_1} \to \mathbb{R}^{d_2}$ for any $d_1, d_2 \in \mathbb{N}$.
 
-It implements the Smolyak interpolation operator, which is known to overcome the curse-of-dimensionality plaguing naive multivariate interpolation [@barthelmann:2000]. The implementation is based on JAX [@jax:2018], a free and open-source Python library for high-performance computing that integrates nearly seamlessly with the Python numpy numerical computing ecosystem. Thanks to JAX's device management, `smolyax` runs natively on both CPU and GPU. While implementing Smolyak interpolation in JAX is challenging due to the highly irregular data structures involved, `smolyax` overcomes this by employing a tailored batching and padding strategy (described below), enabling efficient vectorization, scalability, and parallel execution.
+It implements the Smolyak interpolation operator, which is known to overcome the curse-of-dimensionality plaguing naive multivariate interpolation [@barthelmann:2000]. The implementation is based on JAX [@jax:2018], a free and open-source Python library for high-performance computing that integrates with the Python and NumPy numerical computing ecosystem. Thanks to JAX's device management, `smolyax` runs natively on both CPU and GPU. While implementing Smolyak interpolation in JAX is challenging due to the highly irregular data structures involved, `smolyax` overcomes this by employing a tailored batching and padding strategy, enabling efficient vectorization, scalability, and parallel execution.
 
-`smolyax` supports sparse grid [@bungartz:2004] interpolation nodes based on either Leja [@chkifa:2013] or Gauss-Hermite
-[@abramowitz:1964] node sequences and characterized by $\bsk$-weighted anisotropic multi-index sets
-$$
-\Lambda_{\bsk, t} := \{\bsnu \in \mathbb{N}_0^{d_1} : \sum_{j=1}^{d_1} k_j \nu_j < t\},
-$$
-for $\bsk \in \mathbb{R}^{d_1}$ and $t > 0$. In the special case $\bsk = (1)_{j=1}^{d_1}$, this reduces to the classical total-degree multi-index set. Additional types of interpolation nodes or multi-index sets can be incorporated easily by implementing a minimalistic interface.
+`smolyax` supports interpolation on bounded or unbounded domains via Leja [@chkifa:2013] or Gauss-Hermite [@abramowitz:1964] node sequences, respectively. It provides efficient Numba-accelerated routines to generate isotropic or anisotropic total degree multi-index sets [@adcock:2022, §2.3.2], which are the key ingredient to generate the high-dimensional sparse grids [@bungartz:2004] of interpolation nodes required by the Smolyak interpolation operator. Additional types of node sequences or multi-index sets can be incorporated easily by implementing a minimalistic interface.
 
 # Statement of Need
 
