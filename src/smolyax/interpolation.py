@@ -261,23 +261,9 @@ class SmolyakBarycentricInterpolator:
 
     def __compile_for_batchsize(self, batchsize: int) -> None:
 
-        def __compute_b_centered(x, xi, w, nu_i):
-            b = x - xi
-            mask_zero = jnp.any(b == 0, axis=1)
-            zero_pattern = jnp.where(b == 0, 1.0, 0.0)
-            normal = w / b
-            return jnp.where(mask_zero[:, None], zero_pattern, normal)
-
-        def __compute_b_noncentered(x, xi, w, nu_i):
-            b = x - xi
-            mask_cols = jnp.arange(b.shape[1]) <= nu_i
-            mask_zero = jnp.any((b == 0) & mask_cols, axis=1)
-            b = jnp.where(mask_zero[:, None], (b == 0).astype(b.dtype), jnp.divide(w, b))
-            return jnp.where(mask_cols[None, :], b, 0)
-
-        compute_b = __compute_b_centered
+        compute_basis = barycentric.evaluate_basis_numerator_centered
         if not (self.__zero == 0.0).all():
-            compute_b = __compute_b_noncentered
+            compute_basis = barycentric.evaluate_basis_numerator_noncentered
 
         def __evaluate_tensorproduct_interpolant(
             x: jax.Array,
@@ -322,7 +308,7 @@ class SmolyakBarycentricInterpolator:
             """
             norm = jnp.ones(x.shape[0])
             for i, (si, nui) in enumerate(zip(sorted_dims, sorted_degs)):
-                b = compute_b(x[:, [si]], xi_list[i], w_list[i], nui)
+                b = compute_basis(x[:, [si]], xi_list[i], w_list[i], nui)
                 if i == 0:
                     F = jnp.einsum("ij,kj...->ik...", b, F)
                 else:
