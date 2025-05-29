@@ -59,6 +59,9 @@ class Generator(ABC):
     @abstractmethod
     def __repr__(self) -> str: ...
 
+    @abstractmethod
+    def get_quadrature_weights(self, n: int) -> Union[jax.Array, np.ndarray]: ...
+
 
 class GeneratorMultiD(Generator):
     """Abstract base class for multidimensional interpolation nodes"""
@@ -95,3 +98,6 @@ class GeneratorMultiD(Generator):
 
     @abstractmethod
     def __repr__(self) -> str: ...
+
+    def get_quadrature_weights(self, n: int) -> Union[jax.Array, np.ndarray]:
+        raise

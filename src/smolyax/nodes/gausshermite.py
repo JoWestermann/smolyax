@@ -48,6 +48,9 @@ class GaussHermite1D(Generator):
     def get_random(self, n: int = 1) -> Union[jax.Array, np.ndarray]:
         return self.scale(np.random.randn(n))
 
+    def get_quadrature_weights(self, n: int) -> Union[jax.Array, np.ndarray]:
+        return np.polynomial.hermite.hermgauss(n + 1)[0]
+
 
 class GaussHermite(GeneratorMultiD):
     """Multidimensional Gauss-Hermite node generator."""

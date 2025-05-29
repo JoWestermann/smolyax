@@ -104,6 +104,10 @@ class Leja1D(Generator):
     def get_random(self, n: int = 1):
         return self.scale(np.random.uniform(-1, 1, n))
 
+    def get_quadrature_weights(self, n: int) -> Union[jax.Array, np.ndarray]:
+        # TODO implement me!
+        return np.ones(n + 1)
+
 
 class Leja(GeneratorMultiD):
     """Multidimensional Leja node generator."""

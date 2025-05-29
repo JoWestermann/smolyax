@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from . import barycentric, indices, nodes
+from . import barycentric, indices, nodes, quadrature
 
 jax.config.update("jax_enable_x64", True)
 
@@ -294,3 +294,47 @@ class SmolyakBarycentricInterpolator:
             )
             I_Lambda_x += jnp.tensordot(self.n_2_zetas[n], res, axes=(0, 0))
         return I_Lambda_x.block_until_ready()
+
+    def integrate(self):
+        # assemble quadrature weights, closely following the logic in __init_nodes_and_weights
+        # ----------------------------------------------------------------------------
+        n_2_quad_weights = {}
+
+        for n, nus in self.n_2_nus.items():
+            if n == 0:
+                continue
+
+            nn = len(nus)  # number of multi-indices of length n
+            sorted_degs = self.n_2_sorted_degs[n]
+            sorted_dims = self.n_2_sorted_dims[n]
+            tau = tuple(int(ti) for ti in sorted_degs.max(axis=0))  # per-dimension maximal degree tau_i
+
+            weights_list = [np.zeros((nn, tau_i + 1), dtype=float) for tau_i in tau]
+            for t in range(n):
+                groups: dict[tuple[int, int], list[int]] = defaultdict(list)
+                for i in range(nn):
+                    dim = int(sorted_dims[i, t])
+                    deg = int(sorted_degs[i, t])
+                    groups[(dim, deg)].append(i)
+                for (dim, deg), idxs in groups.items():
+                    wts = self.__node_gen[dim].get_quadrature_weights(deg)
+                    L = len(wts)
+                    weights_list[t][idxs, :L] = wts
+            n_2_quad_weights[n] = [jnp.array(w) for w in weights_list]
+
+        # jit compile and evaluate tensor product terms
+        # ----------------------------------------------------------------------------
+        def __create_evaluate_tensor_product_quadrature(n: int):
+            def __evaluate_tensor_product_quadrature_wrapped(F, *w_list):
+                return quadrature.evaluate_tensor_product_quadrature(F, w_list)
+
+            return jax.vmap(jax.jit(__evaluate_tensor_product_quadrature_wrapped), in_axes=(0,) * (n + 1))
+
+        Q_Lambda = jnp.broadcast_to(self.offset, self.__d_out)
+        for n in self.n_2_F.keys():
+            quadrature_func_n = __create_evaluate_tensor_product_quadrature(n)
+
+            res = quadrature_func_n(self.n_2_F[n], *n_2_quad_weights[n])
+
+            Q_Lambda += jnp.tensordot(self.n_2_zetas[n], res, axes=0)
+        return Q_Lambda.block_until_ready()
