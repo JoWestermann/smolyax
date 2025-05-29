@@ -110,48 +110,6 @@ class SmolyakBarycentricInterpolator:
                 self.n_2_sorted_dims[n][i], self.n_2_sorted_degs[n][i] = zip(*sorted_nu)
                 self.n_2_argsort_dims[n][i] = np.argsort(self.n_2_sorted_dims[n][i])
 
-    def __build_nodes_weights(self, sorted_dims, sorted_degs):
-        """
-        Build lists of per-slot (nn, tau_i+1) arrays of nodes & weights.
-
-        Parameters
-        ----------
-        sorted_dims : np.ndarray[int64] shape (nn, n_dims)
-        sorted_degs : np.ndarray[int64] shape (nn, n_dims)
-
-        Returns
-        -------
-        nodes_list   : list of n_dims arrays, each shape (nn, tau_i+1)
-        weights_list : same shape, filled with barycentric weights
-        """
-        nn, n_dims = sorted_dims.shape
-
-        # compute per-slot max degree tau_i
-        tau = sorted_degs.max(axis=0).astype(int)  # we might want to just keep track of this during construction!
-
-        # pre-allocate output arrays
-        nodes_list = [np.zeros((nn, tau_i + 1), dtype=float) for tau_i in tau]
-        weights_list = [np.zeros((nn, tau_i + 1), dtype=float) for tau_i in tau]
-
-        # for each slot t, group i's by (dim,deg) so we only gen once
-        for t in range(n_dims):
-            groups: dict[tuple[int, int], list[int]] = defaultdict(list)
-            for i in range(nn):
-                dim = int(sorted_dims[i, t])
-                deg = int(sorted_degs[i, t])
-                groups[(dim, deg)].append(i)
-
-            # now for each unique (dim,deg) compute pts & wts once
-            for (dim, deg), idxs in groups.items():
-                pts = self.__node_gen[dim](deg)
-                wts = barycentric.compute_weights(pts)
-                L = len(pts)
-                # Better memory access
-                nodes_list[t][idxs, :L] = pts
-                weights_list[t][idxs, :L] = wts
-            # we can do even better if we vectorize node_gen(degrees) for isotropic rules, like GH or Leja
-        return nodes_list, weights_list
-
     def __init_nodes_and_weights(self):
         self.offset = 0
         self.n_2_F = {}
@@ -166,17 +124,37 @@ class SmolyakBarycentricInterpolator:
                 continue
 
             nn = len(nus)  # number of multi-indices of length n
-            # per-slot max degree tau_i
-            sorted_degs = np.array(self.n_2_sorted_degs[n], dtype=int)
-            tau = tuple(int(ti) for ti in sorted_degs.max(axis=0))
+            sorted_degs = self.n_2_sorted_degs[n]
+            sorted_dims = self.n_2_sorted_dims[n]
+            tau = tuple(int(ti) for ti in sorted_degs.max(axis=0))  # per-dimension maximal degree tau_i
 
-            # allocate the F array
+            # allocate the array storing the functions evaluations
             self.n_2_F[n] = np.zeros((nn, self.__d_out) + tuple(ti + 1 for ti in tau), dtype=float)
 
-            # build  nodes & weights via slicing
-            self.n_2_nodes[n], self.n_2_weights[n] = self.__build_nodes_weights(
-                np.array(self.n_2_sorted_dims[n], dtype=int), sorted_degs
-            )
+            # allocate arrays for weights and nodes
+            nodes_list = [np.zeros((nn, tau_i + 1), dtype=float) for tau_i in tau]
+            weights_list = [np.zeros((nn, tau_i + 1), dtype=float) for tau_i in tau]
+
+            # populate weights and nodes
+            # for each slot t, group i's by (dim,deg) so we only gen once
+            for t in range(n):
+                groups: dict[tuple[int, int], list[int]] = defaultdict(list)
+                for i in range(nn):
+                    dim = int(sorted_dims[i, t])
+                    deg = int(sorted_degs[i, t])
+                    groups[(dim, deg)].append(i)
+
+                # now for each unique (dim,deg) compute pts & wts once
+                for (dim, deg), idxs in groups.items():
+                    pts = self.__node_gen[dim](deg)
+                    wts = barycentric.compute_weights(pts)
+                    L = len(pts)
+                    nodes_list[t][idxs, :L] = pts
+                    weights_list[t][idxs, :L] = wts
+                # we can do even better if we vectorize node_gen(degrees) for isotropic rules, like GH or Leja
+
+            self.n_2_nodes[n] = nodes_list
+            self.n_2_weights[n] = weights_list
 
     def set_f(
         self,
