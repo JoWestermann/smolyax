@@ -261,91 +261,26 @@ class SmolyakBarycentricInterpolator:
 
     def __compile_for_batchsize(self, batchsize: int) -> None:
 
-        compute_basis = barycentric.evaluate_basis_numerator_centered
+        evaluate_b = barycentric.evaluate_basis_numerator_centered
         if not (self.__zero == 0.0).all():
-            compute_basis = barycentric.evaluate_basis_numerator_noncentered
+            evaluate_b = barycentric.evaluate_basis_numerator_noncentered
 
-        def __evaluate_tensorproduct_interpolant(
-            x: jax.Array,
-            F: jax.Array,
-            xi_list: Sequence[jax.Array],
-            w_list: Sequence[jax.Array],
-            sorted_dims: Sequence[int],
-            sorted_degs: Sequence[int],
-        ) -> jax.Array:
-            """
-            Evaluate a tensor product interpolant.
-
-            Parameters
-            ----------
-            x : jax.Array
-                Points at which to evaluate the tensor product interpolant of the target function `f`.
-                Should be a 2D array of shape `(n_points, d_in)` where `n_points` is the number of evaluation points
-                and `d_in` is the dimension of the input domain.
-
-            F : jax.Array
-                Tensors storing the evaluations of the target function `f`.
-                Should be a multi-dimensional array with shape `(d_out, mu_1, mu_2, ..., mu_n)`
-                where each `mu_i` corresponds to the number of points in the ith dimension.
-
-            xi_list : Sequence[jax.Array]
-                Interpolation nodes. A sequence of 1D arrays, each with shape `(mu_i,)` for the ith dimension.
-
-            w_list : Sequence[jax.Array]
-                Interpolation weights. A sequence of 1D arrays, each with shape `(mu_i,)` for the ith dimension.
-
-            sorted_dims : Sequence[int]
-                Dimensions with nonzero interpolation degree.
-
-            sorted_degs : Sequence[int]
-                Interpolation degrees per dimension.
-
-            Returns
-            -------
-            jax.Array
-                The evaluated tensor product interpolant at the points specified by `x`.
-                The shape of the output will be `(n_points, d_out)`.
-            """
-            norm = jnp.ones(x.shape[0])
-            for i, (si, nui) in enumerate(zip(sorted_dims, sorted_degs)):
-                b = compute_basis(x[:, [si]], xi_list[i], w_list[i], nui)
-                if i == 0:
-                    F = jnp.einsum("ij,kj...->ik...", b, F)
-                else:
-                    F = jnp.einsum("ij,ikj...->ik...", b, F)
-                norm *= jnp.sum(b, axis=1)
-            return F / norm[:, None]
-
-        def __create_evaluate_tensorproduct_interpolant_for_vmap(n: int):
-            """
-            Create a JIT-compiled function for evaluating a tensor product interpolant, for use with `jax.vmap`.
-
-            Parameters
-            ----------
-            n : int
-                The number of dimensions in the tensor product interpolant. This determines how the input arguments are
-                split into `xi_list`, `w_list`, and `s_list`.
-
-            Returns
-            -------
-            Callable
-                A JIT-compiled function of __evaluate_tensorproduct_interpolant.
-            """
-
-            def __evaluate_tensorproduct_interpolant_wrapped(x, F, *args):
+        def __create_evaluate_tensor_product_interpolant_for_vmap(n: int):
+            def __evaluate_tensor_product_interpolant_wrapped(x, F, *args):
                 xi_list = args[:n]
                 w_list = args[n : 2 * n]
                 s_list = args[2 * n]
                 nu = args[2 * n + 1]
-                return __evaluate_tensorproduct_interpolant(x, F, xi_list, w_list, s_list, nu)
+                return barycentric.evaluate_tensor_product_interpolant(x, evaluate_b, F, xi_list, w_list, s_list, nu)
 
-            return jax.jit(__evaluate_tensorproduct_interpolant_wrapped)
+            return jax.jit(__evaluate_tensor_product_interpolant_wrapped)
 
         for n in self.n_2_F.keys():
             self.__compiledfuncs[n] = jax.vmap(
-                __create_evaluate_tensorproduct_interpolant_for_vmap(n),
+                __create_evaluate_tensor_product_interpolant_for_vmap(n),
                 in_axes=(None, 0) + (0,) * (2 * n) + (0, 0),
             )
+
         _ = self(jax.random.uniform(jax.random.PRNGKey(0), (batchsize, self.__d_in)))
 
     def __call__(self, x: Union[jax.Array, np.ndarray]) -> jax.Array:

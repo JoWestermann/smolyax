@@ -2,7 +2,7 @@
 Utility functionality for barycentric interpolation.
 """
 
-from typing import Union
+from typing import Callable, Sequence, Union
 
 import jax
 import jax.numpy as jnp
@@ -30,7 +30,7 @@ def compute_weights(nodes: Union[jax.Array, np.ndarray]) -> jax.Array:
     return jnp.prod(1 / diffs, axis=0)
 
 
-def evaluate_basis_numerator_centered(x: jax.Array, xi: jax.Array, w: jax.Array, nu_i: int):
+def evaluate_basis_numerator_centered(x: jax.Array, xi: jax.Array, w: jax.Array, nu_i: int) -> jax.Array:
     r"""
     Evaluate the barycentric basis numerator terms at given evaluation points (assuming a centered domain).
 
@@ -63,7 +63,7 @@ def evaluate_basis_numerator_centered(x: jax.Array, xi: jax.Array, w: jax.Array,
     return jnp.where(mask_zero[:, None], one_hot_pattern, w_div_diffs)
 
 
-def evaluate_basis_numerator_noncentered(x: jax.Array, xi: jax.Array, w: jax.Array, nu_i: int):
+def evaluate_basis_numerator_noncentered(x: jax.Array, xi: jax.Array, w: jax.Array, nu_i: int) -> jax.Array:
     r"""
     Evaluate the barycentric basis numerator terms at given evaluation points (assuming a non-centered domain).
 
@@ -96,3 +96,60 @@ def evaluate_basis_numerator_noncentered(x: jax.Array, xi: jax.Array, w: jax.Arr
     w_div_diffs = jnp.divide(w, diffs)
     b = jnp.where(mask_zero[:, None], one_hot_pattern, w_div_diffs)
     return jnp.where(mask_cols[None, :], b, 0)
+
+
+def evaluate_tensor_product_interpolant(
+    x: jax.Array,
+    evaluate_basis_numerator: Callable,
+    F: jax.Array,
+    xi_list: Sequence[jax.Array],
+    w_list: Sequence[jax.Array],
+    sorted_dims: Sequence[int],
+    sorted_degs: Sequence[int],
+) -> jax.Array:
+    """
+    Evaluate a tensor product interpolant using the barycentric formulation.
+
+    Parameters
+    ----------
+    x : jax.Array
+        Points at which to evaluate the tensor product interpolant of the target function `f`.
+        Should be a 2D array of shape `(n_points, d_in)` where `n_points` is the number of evaluation points
+        and `d_in` is the dimension of the input domain.
+
+    evaluate_basis_numerator : Callable
+        Function that computes the numerator terms of the polynomial basis in the barycentric formulation. Admissible
+        choices are `evaluate_basis_numerator_centered` and `evaluate_basis_numerator_noncentered` from this module.
+
+    F : jax.Array
+        Tensors storing the evaluations of the target function `f`.
+        Should be a multi-dimensional array with shape `(d_out, mu_1, mu_2, ..., mu_n)`
+        where each `mu_i` corresponds to the number of points in the ith dimension.
+
+    xi_list : Sequence[jax.Array]
+        Interpolation nodes. A sequence of 1D arrays, each with shape `(mu_i,)` for the ith dimension.
+
+    w_list : Sequence[jax.Array]
+        Interpolation weights. A sequence of 1D arrays, each with shape `(mu_i,)` for the ith dimension.
+
+    sorted_dims : Sequence[int]
+        Dimensions with nonzero interpolation degree.
+
+    sorted_degs : Sequence[int]
+        Interpolation degrees per dimension.
+
+    Returns
+    -------
+    jax.Array
+        The evaluated tensor product interpolant at the points specified by `x`.
+        The shape of the output will be `(n_points, d_out)`.
+    """
+    norm = jnp.ones(x.shape[0])
+    for i, (si, nui) in enumerate(zip(sorted_dims, sorted_degs)):
+        b = evaluate_basis_numerator(x[:, [si]], xi_list[i], w_list[i], nui)
+        if i == 0:
+            F = jnp.einsum("ij,kj...->ik...", b, F)
+        else:
+            F = jnp.einsum("ij,ikj...->ik...", b, F)
+        norm *= jnp.sum(b, axis=1)
+    return F / norm[:, None]
