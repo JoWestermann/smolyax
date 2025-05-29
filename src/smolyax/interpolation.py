@@ -73,7 +73,7 @@ class SmolyakBarycentricInterpolator:
         # Caching the interpolation node for nu = (0,0,...,0) for reuse in self.set_f
         self.__zero = np.array([g(0)[0] for g in self.__node_gen])
 
-        self.__compiledfuncs = {}
+        self.__compiled_tensor_product_evaluation = {}
 
         if f is not None:
             self.set_f(f=f, batchsize=batchsize)
@@ -243,7 +243,7 @@ class SmolyakBarycentricInterpolator:
         if not (self.__zero == 0.0).all():
             evaluate_b = barycentric.evaluate_basis_numerator_noncentered
 
-        def __create_evaluate_tensor_product_interpolant_for_vmap(n: int):
+        def __create_evaluate_tensor_product_interpolant(n: int):
             def __evaluate_tensor_product_interpolant_wrapped(x, F, *args):
                 xi_list = args[:n]
                 w_list = args[n : 2 * n]
@@ -251,13 +251,12 @@ class SmolyakBarycentricInterpolator:
                 nu = args[2 * n + 1]
                 return barycentric.evaluate_tensor_product_interpolant(x, evaluate_b, F, xi_list, w_list, s_list, nu)
 
-            return jax.jit(__evaluate_tensor_product_interpolant_wrapped)
+            return jax.vmap(
+                jax.jit(__evaluate_tensor_product_interpolant_wrapped), in_axes=(None, 0) + (0,) * (2 * n) + (0, 0)
+            )
 
         for n in self.n_2_F.keys():
-            self.__compiledfuncs[n] = jax.vmap(
-                __create_evaluate_tensor_product_interpolant_for_vmap(n),
-                in_axes=(None, 0) + (0,) * (2 * n) + (0, 0),
-            )
+            self.__compiled_tensor_product_evaluation[n] = __create_evaluate_tensor_product_interpolant(n)
 
         _ = self(jax.random.uniform(jax.random.PRNGKey(0), (batchsize, self.__d_in)))
 
@@ -277,15 +276,15 @@ class SmolyakBarycentricInterpolator:
         jax.Array
             The interpolant of the target function `f` evaluated at points `x`. Shape: `(n_points, d_out)`
         """
-        assert bool(self.__compiledfuncs) == bool(
+        assert bool(self.__compiled_tensor_product_evaluation) == bool(
             self.n_2_F
         ), "The operator has not yet been compiled for a target function."
         x = jnp.asarray(x)
         if x.shape == (self.__d_in,):
             x = x[None, :]
         I_Lambda_x = jnp.broadcast_to(self.offset, (x.shape[0], self.__d_out))
-        for n in self.__compiledfuncs.keys():
-            res = self.__compiledfuncs[n](
+        for n in self.__compiled_tensor_product_evaluation.keys():
+            res = self.__compiled_tensor_product_evaluation[n](
                 x,
                 self.n_2_F[n],
                 *self.n_2_nodes[n],
