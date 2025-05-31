@@ -26,7 +26,9 @@ dev = [
     "flake8",
     "flake8-pyproject",
     "pdoc",
-    "mypy"
+    "mypy",
+    "ipykernel",
+    "matplotlib"
 ]
 
 [tool.black]
