@@ -26,7 +26,7 @@ def test_interpolation():
             ), f"Assertion failed with\n x = {x}\n f(x) = {f(x)}\n ip(x) = {ip(x)} @ n = {n}"
 
 
-def dtest_quadrature():
+def test_quadrature():
     print("\nTesting vector-valued Smolyak quadrature ...")
 
     for node_gen in setup.generate_nodes(n=20, dmin=1, dmax=4):
@@ -41,4 +41,5 @@ def dtest_quadrature():
 
         ip = SmolyakBarycentricInterpolator(node_gen=node_gen, k=k, t=t, d_out=d_out, batchsize=1, f=f)
 
-        print(ip.integrate())
+        Q_ip = ip.integrate()
+        assert Q_ip.shape == (d_out,)

@@ -336,5 +336,5 @@ class SmolyakBarycentricInterpolator:
 
             res = quadrature_func_n(self.n_2_F[n], *n_2_quad_weights[n])
 
-            Q_Lambda += jnp.tensordot(self.n_2_zetas[n], res, axes=0)
+            Q_Lambda += jnp.tensordot(self.n_2_zetas[n], res, axes=1)
         return Q_Lambda.block_until_ready()
