@@ -1,4 +1,4 @@
-from typing import Callable, List
+from typing import List, Sequence
 
 import numpy as np
 from numpy.polynomial.hermite import hermval
@@ -49,41 +49,43 @@ def generate_nodes(*, n: int, dmin: int, dmax: int) -> List[nodes.Generator]:
     return sets
 
 
-def evaluate_univariate_polynomial(node_gen: nodes.Generator, nu: int, x: ArrayLike) -> ArrayLike:
-    x = node_gen.scale_back(x)
-    if isinstance(node_gen, nodes.Leja):
-        return legval(x, [0] * nu + [1])
+def evaluate_univariate_polynomial(node_gen_uni: nodes.Generator, degree: int, x: np.ndarray) -> ArrayLike:
+    x = node_gen_uni.scale_back(x)
+    coefficients = [0] * degree + [1]
+    if isinstance(node_gen_uni, nodes.Leja1D):
+        return legval(x, coefficients)
+    elif isinstance(node_gen_uni, nodes.GaussHermite1D):
+        return hermval(x, coefficients)
     else:
-        return hermval(x, [0] * nu + [1])
+        raise TypeError(f"Unsupported node generator type: {type(node_gen_uni)}")
 
 
-def evaluate_multivariate_polynomial(node_gen: nodes.Generator, nu: ArrayLike, x: ArrayLike) -> ArrayLike:
-    if x.ndim <= 1:
-        return np.prod([evaluate_univariate_polynomial(gi, nui, xi) for gi, nui, xi in zip(node_gen, nu, x)])
-    elif x.ndim == 2:
-        return np.prod(
-            np.array([evaluate_univariate_polynomial(gi, nui, xi) for gi, nui, xi in zip(node_gen, nu, x.T)]),
-            axis=0,
-        ).T
-    else:
-        raise
+class TestPolynomial:
 
+    def __init__(self, *, node_gen: nodes.Generator, k: ArrayLike, t: ArrayLike, d_out: int):
+        self.node_gen = node_gen
 
-def generate_test_function_tensorproduct(*, node_gen: nodes.Generator, nu: ArrayLike) -> Callable:
-    if np.isscalar(nu):
-        return lambda x: evaluate_univariate_polynomial(node_gen, nu, x)
-    return lambda x: evaluate_multivariate_polynomial(node_gen, nu, x)
+        if np.isscalar(t):
+            t = [t] * d_out
+        assert len(t) == d_out
 
+        self.selected_idxs = []
+        for ti in t:
+            idxs = indices.indexset(k, ti)
+            j = np.random.randint(len(idxs))
+            self.selected_idxs.append(sparse_index_to_dense(idxs[j], dim=len(k)))
+        print("\t Test polynomials with degrees", self.selected_idxs)
 
-def generate_test_function_smolyak(*, node_gen: nodes.Generator, k: ArrayLike, t: ArrayLike, d_out: int) -> Callable:
-    if np.isscalar(t):
-        t = [t] * d_out
-    assert len(t) == d_out
+    def __call__(self, x: np.ndarray) -> ArrayLike:
+        return np.array([self.__evaluate_multivariate_polynomial(nu, x) for nu in self.selected_idxs]).T
 
-    selected_idxs = []
-    for ti in t:
-        idxs = indices.indexset(k, ti)
-        j = np.random.randint(len(idxs))
-        selected_idxs.append(sparse_index_to_dense(idxs[j], dim=len(k)))
-    print("\t Test polynomials with degrees", selected_idxs)
-    return lambda x: np.array([evaluate_multivariate_polynomial(node_gen, nu, x) for nu in selected_idxs]).T
+    def __evaluate_multivariate_polynomial(self, nu: Sequence[int], x: np.ndarray) -> ArrayLike:
+        if x.ndim == 1:
+            return np.prod([evaluate_univariate_polynomial(g, n, xi) for g, n, xi in zip(self.node_gen, nu, x)])
+        elif x.ndim == 2:
+            return np.prod(
+                [evaluate_univariate_polynomial(g, n, x[:, i]) for i, (g, n) in enumerate(zip(self.node_gen, nu))],
+                axis=0,
+            )
+        else:
+            raise ValueError("Input x must be 1D or 2D")
