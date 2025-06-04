@@ -1,8 +1,7 @@
 from typing import List, Sequence
 
 import numpy as np
-from numpy.polynomial.hermite import hermval
-from numpy.polynomial.legendre import legval
+from numpy.polynomial import hermite, legendre
 from numpy.typing import ArrayLike
 
 from smolyax import indices, nodes
@@ -53,9 +52,9 @@ def evaluate_univariate_polynomial(node_gen_uni: nodes.Generator, degree: int, x
     x = node_gen_uni.scale_back(x)
     coefficients = [0] * degree + [1]
     if isinstance(node_gen_uni, nodes.Leja1D):
-        return legval(x, coefficients)
+        return legendre.legval(x, coefficients)
     elif isinstance(node_gen_uni, nodes.GaussHermite1D):
-        return hermval(x, coefficients)
+        return hermite.hermval(x, coefficients)
     else:
         raise TypeError(f"Unsupported node generator type: {type(node_gen_uni)}")
 
@@ -74,7 +73,7 @@ class TestPolynomial:
             idxs = indices.indexset(k, ti)
             j = np.random.randint(len(idxs))
             self.selected_idxs.append(sparse_index_to_dense(idxs[j], dim=len(k)))
-        print("\t Test polynomials with degrees", self.selected_idxs)
+        print("\tTest polynomials with degrees", self.selected_idxs)
 
     def __call__(self, x: np.ndarray) -> ArrayLike:
         return np.array([self.__evaluate_multivariate_polynomial(nu, x) for nu in self.selected_idxs]).T
@@ -89,3 +88,6 @@ class TestPolynomial:
             )
         else:
             raise ValueError("Input x must be 1D or 2D")
+
+    def integral(self) -> ArrayLike:
+        return np.array([np.prod([1 if n == 0 else 0 for g, n in zip(self.node_gen, nu)]) for nu in self.selected_idxs])

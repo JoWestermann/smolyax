@@ -29,7 +29,7 @@ def test_interpolation():
 def test_quadrature():
     print("\nTesting vector-valued Smolyak quadrature ...")
 
-    for node_gen in setup.generate_nodes(n=20, dmin=1, dmax=4):
+    for node_gen in setup.generate_nodes_default(dmin=1, dmax=6):
 
         k = sorted(np.random.uniform(low=1, high=10, size=node_gen.dim))
         k /= k[0]
@@ -41,5 +41,9 @@ def test_quadrature():
 
         ip = SmolyakBarycentricInterpolator(node_gen=node_gen, k=k, t=t, d_out=d_out, batchsize=1, f=f)
 
-        Q_ip = ip.integrate()
+        Q_ip = ip.integral()
         assert Q_ip.shape == (d_out,)
+
+        Q_f = f.integral()
+        print(f"\tIntegral of f = {Q_f}\n\tQ[f] = {Q_ip}")
+        assert np.allclose(Q_ip, Q_f), f"Assertion failed with\n Q[f] = {Q_ip}\n Integral of f = {Q_f}"

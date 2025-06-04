@@ -295,7 +295,7 @@ class SmolyakBarycentricInterpolator:
             I_Lambda_x += jnp.tensordot(self.n_2_zetas[n], res, axes=(0, 0))
         return I_Lambda_x.block_until_ready()
 
-    def integrate(self):
+    def integral(self):
         # assemble quadrature weights, closely following the logic in __init_nodes_and_weights
         # ----------------------------------------------------------------------------
         n_2_quad_weights = {}

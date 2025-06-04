@@ -46,10 +46,10 @@ class GaussHermite1D(Generator):
         return (x - self.__mean) / self.__scaling
 
     def get_random(self, n: int = 1) -> Union[jax.Array, np.ndarray]:
-        return self.scale(np.random.randn(n))
+        return self.scale(np.random.randn(n) / np.sqrt(2))
 
     def get_quadrature_weights(self, n: int) -> Union[jax.Array, np.ndarray]:
-        return np.polynomial.hermite.hermgauss(n + 1)[0]
+        return np.polynomial.hermite.hermgauss(n + 1)[1] / np.sqrt(np.pi)
 
 
 class GaussHermite(GeneratorMultiD):
