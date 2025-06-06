@@ -105,11 +105,10 @@ class Leja1D(Generator):
         return self.scale(np.random.uniform(-1, 1, n))
 
     def get_quadrature_weights(self, n: int) -> Union[jax.Array, np.ndarray]:
-        quadrature_points = self(n)
+        quadrature_points = self.scale_back(self(n))
         vm_matrix = np.vstack([quadrature_points**i for i in range(n + 1)])
         rhs = np.array([(1 + (-1) ** i) / (2.0 * (i + 1)) for i in range(n + 1)])
         quad_weights = np.linalg.solve(vm_matrix, rhs)
-        # vol = 2 if self.__domain is None else self.__domain[1] - self.__domain[0]
         return quad_weights
 
 
