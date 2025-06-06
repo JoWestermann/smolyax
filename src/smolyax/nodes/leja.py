@@ -10,6 +10,10 @@ from .base import Generator, GeneratorMultiD
 class Leja1D(Generator):
     """A generator for Leja points, a nested sequence on a closed one-dimensional domain."""
 
+    @property
+    def domain(self) -> Union[jax.Array, np.ndarray, Sequence[float]]:
+        return self.__domain
+
     __nodes = np.array([0, 1, -1, 1 / np.sqrt(2), -1 / np.sqrt(2)])
 
     def __init__(self, domain: Union[jax.Array, np.ndarray, Sequence[float]] = None) -> None:

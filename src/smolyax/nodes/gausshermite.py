@@ -10,6 +10,14 @@ from .base import Generator, GeneratorMultiD
 class GaussHermite1D(Generator):
     """Generator for Gauss-Hermite points, a non-nested node sequence on the real line."""
 
+    @property
+    def mean(self) -> float:
+        return self.__mean
+
+    @property
+    def scaling(self) -> float:
+        return self.__scaling
+
     def __init__(self, mean: float = 0.0, scaling: float = 1.0) -> None:
         """
         Initialize the one-dimensional Gauss-Hermite node generator.

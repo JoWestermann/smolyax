@@ -74,6 +74,7 @@ class SmolyakBarycentricInterpolator:
         self.__zero = np.array([g(0)[0] for g in self.__node_gen])
 
         self.__compiled_tensor_product_evaluation = {}
+        self.__compiled_gradient = None
 
         if f is not None:
             self.set_f(f=f, batchsize=batchsize)
@@ -260,6 +261,11 @@ class SmolyakBarycentricInterpolator:
 
         _ = self(jax.random.uniform(jax.random.PRNGKey(0), (batchsize, self.__d_in)))
 
+        if self.d_out >= self.d_in:
+            self.__compiled_gradient = jax.vmap(jax.jit(jax.jacfwd(self.__call__)), in_axes=0)
+        else:
+            self.__compiled_gradient = jax.vmap(jax.jit(jax.jacrev(self.__call__)), in_axes=0)
+
     def __call__(self, x: Union[jax.Array, np.ndarray]) -> jax.Array:
         """@public
         Evaluate the Smolyak operator at points `x`.
@@ -293,7 +299,11 @@ class SmolyakBarycentricInterpolator:
                 self.n_2_sorted_degs[n],
             )
             I_Lambda_x += jnp.tensordot(self.n_2_zetas[n], res, axes=(0, 0))
-        return I_Lambda_x.block_until_ready()
+        return I_Lambda_x
+
+    def gradient(self, x: Union[jax.Array, np.ndarray]) -> jax.Array:
+        grad = self.__compiled_gradient(x)
+        return jnp.reshape(grad, (grad.shape[0],) + grad.shape[2:])
 
     def integral(self):
         # assemble quadrature weights, closely following the logic in __init_nodes_and_weights
