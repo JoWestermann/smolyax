@@ -14,6 +14,7 @@ while the threshold $t > 0$ controls the cardinality of the set.
 - Heuristics to determine the threshold parameter $t$ to construct a set $\Lambda$ with a specified cardinality (which is typically not analytically available)
 - Smolyak operator for interpolating high-dimensional and vector-valued functions
 $f : \mathbb{R}^{d_1} \to \mathbb{R}^{d_2}$ for $d_1, d_2 \in \mathbb{N}$ potentially large.
+- Functionality to compute the integral of the interpolant (quadrature) as well as evaluate its derivative.
 
 The implementation is designed for maximal efficiency.
 As a rough example consider interpolation a scalar function with $d_1 = 10^3$ inputs using $n = 10^4$ interpolation nodes.
