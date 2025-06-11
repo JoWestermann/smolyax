@@ -32,12 +32,13 @@ class GaussHermite1D(Generator):
         super().__init__(dim=1, is_nested=False)
         self.__mean = mean
         self.__scaling = scaling
-        self.__cached_scaled_gh_n_plus_1 = self.__make_cached_scaled_gauss_hermite_n_plus_1()
+        self.__cached_call = self.__make_cached_call()
+        self.__cached_get_quadrature_weights = self.__make_cached_get_quadrature_weights()
 
     def __repr__(self) -> str:
         return f"Gauss-Hermite (mean = {self.__mean}, scaling = {self.__scaling})"
 
-    def __make_cached_scaled_gauss_hermite_n_plus_1(self):
+    def __make_cached_call(self):
         @lru_cache(maxsize=None)
         def cached(n):
             return self.scale(np.polynomial.hermite.hermgauss(n + 1)[0])
@@ -45,7 +46,18 @@ class GaussHermite1D(Generator):
         return cached
 
     def __call__(self, n: int) -> Union[jax.Array, np.ndarray]:
-        return self.__cached_scaled_gh_n_plus_1(n)
+        return self.__cached_call(n)
+
+    @staticmethod
+    def __make_cached_get_quadrature_weights():
+        @lru_cache(maxsize=None)
+        def cached(n):
+            return np.polynomial.hermite.hermgauss(n + 1)[1] / np.sqrt(np.pi)
+
+        return cached
+
+    def get_quadrature_weights(self, n: int) -> Union[jax.Array, np.ndarray]:
+        return self.__cached_get_quadrature_weights(n)
 
     def scale(self, x: Union[jax.Array, np.ndarray]) -> Union[jax.Array, np.ndarray]:
         return self.__mean + self.__scaling * x
@@ -55,9 +67,6 @@ class GaussHermite1D(Generator):
 
     def get_random(self, n: int = 1) -> Union[jax.Array, np.ndarray]:
         return self.scale(np.random.randn(n) / np.sqrt(2))
-
-    def get_quadrature_weights(self, n: int) -> Union[jax.Array, np.ndarray]:
-        return np.polynomial.hermite.hermgauss(n + 1)[1] / np.sqrt(np.pi)
 
 
 class GaussHermite(GeneratorMultiD):
