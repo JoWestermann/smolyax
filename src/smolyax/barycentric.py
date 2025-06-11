@@ -67,8 +67,8 @@ def evaluate_basis_numerator_noncentered(x: jax.Array, xi: jax.Array, w: jax.Arr
     r"""
     Evaluate the barycentric basis numerator terms at given evaluation points (assuming a non-centered domain).
 
-    Computes $w_j / (x - \xi_j)$ for indices $j ≤ \nu_i$; other entries are masked to zero.
-    If an evaluation point coincides with a node $\xi_j$ for $j ≤ \nu_i$, returns a one-hot indicator pattern restricted
+    Computes $w_j / (x - \xi_j)$ for indices $j \le \nu_i$; other entries are masked to zero.
+    If an evaluation point coincides with a node $\xi_j$ for $j \le \nu_i$, returns a one-hot indicator pattern restricted
     to those entries.
 
     Parameters
@@ -86,7 +86,7 @@ def evaluate_basis_numerator_noncentered(x: jax.Array, xi: jax.Array, w: jax.Arr
     Returns
     -------
     b : jax.Array
-        Barycentric numerator terms for indices $j ≤ \nu_i$, or a one-hot indicator pattern if `x` coincides with a
+        Barycentric numerator terms for indices $j \le \nu_i$, or a one-hot indicator pattern if `x` coincides with a
         node. Shape `(n_points, m_i)`.
     """
     diffs = x - xi
