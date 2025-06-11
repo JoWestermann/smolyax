@@ -302,10 +302,33 @@ class SmolyakBarycentricInterpolator:
         return I_Lambda_x
 
     def gradient(self, x: Union[jax.Array, np.ndarray]) -> jax.Array:
+        """
+        Compute the gradient of the Smolyak interpolant at the given points.
+
+        Parameters
+        ----------
+        x : Union[jax.Array, numpy.ndarray]
+            Points at which to evaluate the gradient. Shape: `(n_points, d_in)`
+
+        Returns
+        -------
+        jax.Array
+            Gradient of the interpolant evaluated at `x`.
+            Shape: `(n_points, d_out, d_in)`.
+        """
         grad = self.__compiled_gradient(x)
         return jnp.reshape(grad, (grad.shape[0],) + grad.shape[2:])
 
-    def integral(self):
+    def integral(self) -> jax.Array:
+        """
+        Compute the integral of the Smolyak interpolant. Note that this is equivalent to a Smolyak quadrature
+        approximation to the integral of the target function `f`.
+
+        Returns
+        -------
+        jax.Array
+            Integral of the interpolant. Shape: `(d_out,)`.
+        """
         # assemble quadrature weights, closely following the logic in __init_nodes_and_weights
         # ----------------------------------------------------------------------------
         n_2_quad_weights = {}
