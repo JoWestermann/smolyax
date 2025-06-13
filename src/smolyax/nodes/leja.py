@@ -10,6 +10,10 @@ from .base import Generator, GeneratorMultiD
 class Leja1D(Generator):
     """A generator for Leja points, a nested sequence on a closed one-dimensional domain."""
 
+    @property
+    def domain(self) -> Union[jax.Array, np.ndarray, Sequence[float]]:
+        return self.__domain
+
     __nodes = np.array([0, 1, -1, 1 / np.sqrt(2), -1 / np.sqrt(2)])
 
     def __init__(self, domain: Union[jax.Array, np.ndarray, Sequence[float]] = None) -> None:
@@ -27,7 +31,8 @@ class Leja1D(Generator):
         if domain is not None:
             self.__domain = np.asarray(domain)
             self.__reference_domain = (-1, 1)
-        self.__cached_scaled_call = self.__make_cached_scaled_call()
+        self.__cached_call = self.__make_cached_call()
+        self.__cached_get_quadrature_weights = self.__make_cached_get_quadrature_weights()
 
     def __repr__(self) -> str:
         return f"Leja (domain = {self.__domain})"
@@ -43,7 +48,7 @@ class Leja1D(Generator):
                 else:
                     cls.__nodes[j] = np.sqrt((cls.__nodes[int((j + 1) / 2)] + 1) / 2)
 
-    def __make_cached_scaled_call(self):
+    def __make_cached_call(self):
         @lru_cache(maxsize=None)
         def cached(n):
             self.__ensure_nodes(n)
@@ -52,7 +57,22 @@ class Leja1D(Generator):
         return cached
 
     def __call__(self, n: int) -> Union[jax.Array, np.ndarray]:
-        return self.__cached_scaled_call(n)
+        return self.__cached_call(n)
+
+    def __make_cached_get_quadrature_weights(self):
+        @lru_cache(maxsize=None)
+        def cached(n):
+            self.__ensure_nodes(n)
+            quadrature_points = self.__nodes[: n + 1]
+            vm_matrix = np.vstack([quadrature_points**i for i in range(n + 1)])
+            rhs = np.array([(1 + (-1) ** i) / (2.0 * (i + 1)) for i in range(n + 1)])
+            quadrature_weights = np.linalg.solve(vm_matrix, rhs)
+            return quadrature_weights
+
+        return cached
+
+    def get_quadrature_weights(self, n: int) -> Union[jax.Array, np.ndarray]:
+        return self.__cached_get_quadrature_weights(n)
 
     def scale(
         self,

@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from . import barycentric, indices, nodes
+from . import barycentric, indices, nodes, quadrature
 
 jax.config.update("jax_enable_x64", True)
 
@@ -73,7 +73,8 @@ class SmolyakBarycentricInterpolator:
         # Caching the interpolation node for nu = (0,0,...,0) for reuse in self.set_f
         self.__zero = np.array([g(0)[0] for g in self.__node_gen])
 
-        self.__compiledfuncs = {}
+        self.__compiled_tensor_product_evaluation = {}
+        self.__compiled_gradient = None
 
         if f is not None:
             self.set_f(f=f, batchsize=batchsize)
@@ -110,48 +111,6 @@ class SmolyakBarycentricInterpolator:
                 self.n_2_sorted_dims[n][i], self.n_2_sorted_degs[n][i] = zip(*sorted_nu)
                 self.n_2_argsort_dims[n][i] = np.argsort(self.n_2_sorted_dims[n][i])
 
-    def __build_nodes_weights(self, sorted_dims, sorted_degs):
-        """
-        Build lists of per-slot (nn, tau_i+1) arrays of nodes & weights.
-
-        Parameters
-        ----------
-        sorted_dims : np.ndarray[int64] shape (nn, n_dims)
-        sorted_degs : np.ndarray[int64] shape (nn, n_dims)
-
-        Returns
-        -------
-        nodes_list   : list of n_dims arrays, each shape (nn, tau_i+1)
-        weights_list : same shape, filled with barycentric weights
-        """
-        nn, n_dims = sorted_dims.shape
-
-        # compute per-slot max degree tau_i
-        tau = sorted_degs.max(axis=0).astype(int)  # we might want to just keep track of this during construction!
-
-        # pre-allocate output arrays
-        nodes_list = [np.zeros((nn, tau_i + 1), dtype=float) for tau_i in tau]
-        weights_list = [np.zeros((nn, tau_i + 1), dtype=float) for tau_i in tau]
-
-        # for each slot t, group i's by (dim,deg) so we only gen once
-        for t in range(n_dims):
-            groups: dict[tuple[int, int], list[int]] = defaultdict(list)
-            for i in range(nn):
-                dim = int(sorted_dims[i, t])
-                deg = int(sorted_degs[i, t])
-                groups[(dim, deg)].append(i)
-
-            # now for each unique (dim,deg) compute pts & wts once
-            for (dim, deg), idxs in groups.items():
-                pts = self.__node_gen[dim](deg)
-                wts = barycentric.compute_weights(pts)
-                L = len(pts)
-                # Better memory access
-                nodes_list[t][idxs, :L] = pts
-                weights_list[t][idxs, :L] = wts
-            # we can do even better if we vectorize node_gen(degrees) for isotropic rules, like GH or Leja
-        return nodes_list, weights_list
-
     def __init_nodes_and_weights(self):
         self.offset = 0
         self.n_2_F = {}
@@ -166,17 +125,37 @@ class SmolyakBarycentricInterpolator:
                 continue
 
             nn = len(nus)  # number of multi-indices of length n
-            # per-slot max degree tau_i
-            sorted_degs = np.array(self.n_2_sorted_degs[n], dtype=int)
-            tau = tuple(int(ti) for ti in sorted_degs.max(axis=0))
+            sorted_degs = self.n_2_sorted_degs[n]
+            sorted_dims = self.n_2_sorted_dims[n]
+            tau = tuple(int(ti) for ti in sorted_degs.max(axis=0))  # per-dimension maximal degree tau_i
 
-            # allocate the F array
+            # allocate the array storing the functions evaluations
             self.n_2_F[n] = np.zeros((nn, self.__d_out) + tuple(ti + 1 for ti in tau), dtype=float)
 
-            # build  nodes & weights via slicing
-            self.n_2_nodes[n], self.n_2_weights[n] = self.__build_nodes_weights(
-                np.array(self.n_2_sorted_dims[n], dtype=int), sorted_degs
-            )
+            # allocate arrays for weights and nodes
+            nodes_list = [np.zeros((nn, tau_i + 1), dtype=float) for tau_i in tau]
+            weights_list = [np.zeros((nn, tau_i + 1), dtype=float) for tau_i in tau]
+
+            # populate weights and nodes
+            # for each slot t, group i's by (dim,deg) so we only gen once
+            for t in range(n):
+                groups: dict[tuple[int, int], list[int]] = defaultdict(list)
+                for i in range(nn):
+                    dim = int(sorted_dims[i, t])
+                    deg = int(sorted_degs[i, t])
+                    groups[(dim, deg)].append(i)
+
+                # now for each unique (dim,deg) compute pts & wts once
+                for (dim, deg), idxs in groups.items():
+                    pts = self.__node_gen[dim](deg)
+                    wts = barycentric.compute_weights(pts)
+                    L = len(pts)
+                    nodes_list[t][idxs, :L] = pts
+                    weights_list[t][idxs, :L] = wts
+                # we can do even better if we vectorize node_gen(degrees) for isotropic rules, like GH or Leja
+
+            self.n_2_nodes[n] = nodes_list
+            self.n_2_weights[n] = weights_list
 
     def set_f(
         self,
@@ -261,106 +240,31 @@ class SmolyakBarycentricInterpolator:
 
     def __compile_for_batchsize(self, batchsize: int) -> None:
 
-        def __compute_b_centered(x, xi, w, nu_i):
-            b = x - xi
-            mask_zero = jnp.any(b == 0, axis=1)
-            zero_pattern = jnp.where(b == 0, 1.0, 0.0)
-            normal = w / b
-            return jnp.where(mask_zero[:, None], zero_pattern, normal)
-
-        def __compute_b_noncentered(x, xi, w, nu_i):
-            b = x - xi
-            mask_cols = jnp.arange(b.shape[1]) <= nu_i
-            mask_zero = jnp.any((b == 0) & mask_cols, axis=1)
-            b = jnp.where(mask_zero[:, None], (b == 0).astype(b.dtype), jnp.divide(w, b))
-            return jnp.where(mask_cols[None, :], b, 0)
-
-        compute_b = __compute_b_centered
+        evaluate_b = barycentric.evaluate_basis_numerator_centered
         if not (self.__zero == 0.0).all():
-            compute_b = __compute_b_noncentered
+            evaluate_b = barycentric.evaluate_basis_numerator_noncentered
 
-        def __evaluate_tensorproduct_interpolant(
-            x: jax.Array,
-            F: jax.Array,
-            xi_list: Sequence[jax.Array],
-            w_list: Sequence[jax.Array],
-            sorted_dims: Sequence[int],
-            sorted_degs: Sequence[int],
-        ) -> jax.Array:
-            """
-            Evaluate a tensor product interpolant.
-
-            Parameters
-            ----------
-            x : jax.Array
-                Points at which to evaluate the tensor product interpolant of the target function `f`.
-                Should be a 2D array of shape `(n_points, d_in)` where `n_points` is the number of evaluation points
-                and `d_in` is the dimension of the input domain.
-
-            F : jax.Array
-                Tensors storing the evaluations of the target function `f`.
-                Should be a multi-dimensional array with shape `(d_out, mu_1, mu_2, ..., mu_n)`
-                where each `mu_i` corresponds to the number of points in the ith dimension.
-
-            xi_list : Sequence[jax.Array]
-                Interpolation nodes. A sequence of 1D arrays, each with shape `(mu_i,)` for the ith dimension.
-
-            w_list : Sequence[jax.Array]
-                Interpolation weights. A sequence of 1D arrays, each with shape `(mu_i,)` for the ith dimension.
-
-            sorted_dims : Sequence[int]
-                Dimensions with nonzero interpolation degree.
-
-            sorted_degs : Sequence[int]
-                Interpolation degrees per dimension.
-
-            Returns
-            -------
-            jax.Array
-                The evaluated tensor product interpolant at the points specified by `x`.
-                The shape of the output will be `(n_points, d_out)`.
-            """
-            norm = jnp.ones(x.shape[0])
-            for i, (si, nui) in enumerate(zip(sorted_dims, sorted_degs)):
-                b = compute_b(x[:, [si]], xi_list[i], w_list[i], nui)
-                if i == 0:
-                    F = jnp.einsum("ij,kj...->ik...", b, F)
-                else:
-                    F = jnp.einsum("ij,ikj...->ik...", b, F)
-                norm *= jnp.sum(b, axis=1)
-            return F / norm[:, None]
-
-        def __create_evaluate_tensorproduct_interpolant_for_vmap(n: int):
-            """
-            Create a JIT-compiled function for evaluating a tensor product interpolant, for use with `jax.vmap`.
-
-            Parameters
-            ----------
-            n : int
-                The number of dimensions in the tensor product interpolant. This determines how the input arguments are
-                split into `xi_list`, `w_list`, and `s_list`.
-
-            Returns
-            -------
-            Callable
-                A JIT-compiled function of __evaluate_tensorproduct_interpolant.
-            """
-
-            def __evaluate_tensorproduct_interpolant_wrapped(x, F, *args):
+        def __create_evaluate_tensor_product_interpolant(n: int):
+            def __evaluate_tensor_product_interpolant_wrapped(x, F, *args):
                 xi_list = args[:n]
                 w_list = args[n : 2 * n]
                 s_list = args[2 * n]
                 nu = args[2 * n + 1]
-                return __evaluate_tensorproduct_interpolant(x, F, xi_list, w_list, s_list, nu)
+                return barycentric.evaluate_tensor_product_interpolant(x, evaluate_b, F, xi_list, w_list, s_list, nu)
 
-            return jax.jit(__evaluate_tensorproduct_interpolant_wrapped)
+            return jax.vmap(
+                jax.jit(__evaluate_tensor_product_interpolant_wrapped), in_axes=(None, 0) + (0,) * (2 * n) + (0, 0)
+            )
 
         for n in self.n_2_F.keys():
-            self.__compiledfuncs[n] = jax.vmap(
-                __create_evaluate_tensorproduct_interpolant_for_vmap(n),
-                in_axes=(None, 0) + (0,) * (2 * n) + (0, 0),
-            )
+            self.__compiled_tensor_product_evaluation[n] = __create_evaluate_tensor_product_interpolant(n)
+
         _ = self(jax.random.uniform(jax.random.PRNGKey(0), (batchsize, self.__d_in)))
+
+        if self.d_out >= self.d_in:
+            self.__compiled_gradient = jax.vmap(jax.jit(jax.jacfwd(self.__call__)), in_axes=0)
+        else:
+            self.__compiled_gradient = jax.vmap(jax.jit(jax.jacrev(self.__call__)), in_axes=0)
 
     def __call__(self, x: Union[jax.Array, np.ndarray]) -> jax.Array:
         """@public
@@ -378,15 +282,15 @@ class SmolyakBarycentricInterpolator:
         jax.Array
             The interpolant of the target function `f` evaluated at points `x`. Shape: `(n_points, d_out)`
         """
-        assert bool(self.__compiledfuncs) == bool(
+        assert bool(self.__compiled_tensor_product_evaluation) == bool(
             self.n_2_F
         ), "The operator has not yet been compiled for a target function."
         x = jnp.asarray(x)
         if x.shape == (self.__d_in,):
             x = x[None, :]
         I_Lambda_x = jnp.broadcast_to(self.offset, (x.shape[0], self.__d_out))
-        for n in self.__compiledfuncs.keys():
-            res = self.__compiledfuncs[n](
+        for n in self.__compiled_tensor_product_evaluation.keys():
+            res = self.__compiled_tensor_product_evaluation[n](
                 x,
                 self.n_2_F[n],
                 *self.n_2_nodes[n],
@@ -395,4 +299,75 @@ class SmolyakBarycentricInterpolator:
                 self.n_2_sorted_degs[n],
             )
             I_Lambda_x += jnp.tensordot(self.n_2_zetas[n], res, axes=(0, 0))
-        return I_Lambda_x.block_until_ready()
+        return I_Lambda_x
+
+    def gradient(self, x: Union[jax.Array, np.ndarray]) -> jax.Array:
+        """
+        Compute the gradient of the Smolyak interpolant at the given points.
+
+        Parameters
+        ----------
+        x : Union[jax.Array, numpy.ndarray]
+            Points at which to evaluate the gradient. Shape: `(n_points, d_in)`
+
+        Returns
+        -------
+        jax.Array
+            Gradient of the interpolant evaluated at `x`.
+            Shape: `(n_points, d_out, d_in)`.
+        """
+        grad = self.__compiled_gradient(x)
+        return jnp.reshape(grad, (grad.shape[0],) + grad.shape[2:])
+
+    def integral(self) -> jax.Array:
+        """
+        Compute the integral of the Smolyak interpolant. Note that this is equivalent to a Smolyak quadrature
+        approximation to the integral of the target function `f`.
+
+        Returns
+        -------
+        jax.Array
+            Integral of the interpolant. Shape: `(d_out,)`.
+        """
+        # assemble quadrature weights, closely following the logic in __init_nodes_and_weights
+        # ----------------------------------------------------------------------------
+        n_2_quad_weights = {}
+
+        for n, nus in self.n_2_nus.items():
+            if n == 0:
+                continue
+
+            nn = len(nus)  # number of multi-indices of length n
+            sorted_degs = self.n_2_sorted_degs[n]
+            sorted_dims = self.n_2_sorted_dims[n]
+            tau = tuple(int(ti) for ti in sorted_degs.max(axis=0))  # per-dimension maximal degree tau_i
+
+            weights_list = [np.zeros((nn, tau_i + 1), dtype=float) for tau_i in tau]
+            for t in range(n):
+                groups: dict[tuple[int, int], list[int]] = defaultdict(list)
+                for i in range(nn):
+                    dim = int(sorted_dims[i, t])
+                    deg = int(sorted_degs[i, t])
+                    groups[(dim, deg)].append(i)
+                for (dim, deg), idxs in groups.items():
+                    wts = self.__node_gen[dim].get_quadrature_weights(deg)
+                    L = len(wts)
+                    weights_list[t][idxs, :L] = wts
+            n_2_quad_weights[n] = [jnp.array(w) for w in weights_list]
+
+        # jit compile and evaluate tensor product terms
+        # ----------------------------------------------------------------------------
+        def __create_evaluate_tensor_product_quadrature(n: int):
+            def __evaluate_tensor_product_quadrature_wrapped(F, *w_list):
+                return quadrature.evaluate_tensor_product_quadrature(F, w_list)
+
+            return jax.vmap(jax.jit(__evaluate_tensor_product_quadrature_wrapped), in_axes=(0,) * (n + 1))
+
+        Q_Lambda = jnp.broadcast_to(self.offset, self.__d_out)
+        for n in self.n_2_F.keys():
+            quadrature_func_n = __create_evaluate_tensor_product_quadrature(n)
+
+            res = quadrature_func_n(self.n_2_F[n], *n_2_quad_weights[n])
+
+            Q_Lambda += jnp.tensordot(self.n_2_zetas[n], res, axes=1)
+        return Q_Lambda.block_until_ready()
