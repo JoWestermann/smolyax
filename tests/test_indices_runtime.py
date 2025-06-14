@@ -1,5 +1,3 @@
-import sys
-
 import numpy as np
 import pytest
 
@@ -15,9 +13,6 @@ from smolyax import indices
     ],
 )
 def test_indexset_runtime(benchmark, d, t, m):
-    limit = d + 100
-    if sys.getrecursionlimit() < limit:
-        sys.setrecursionlimit(limit)
     k = np.log([2 + i for i in range(d)]) / np.log(2)
     iset = benchmark(lambda: indices.indexset(k, t))
     assert len(iset) == m
@@ -34,9 +29,6 @@ def test_indexset_runtime(benchmark, d, t, m):
 )
 def test_find_threshold_runtime(benchmark, d, m, nested):
     accuracy = 0.01 if nested else 0.1
-    limit = d + 100
-    if sys.getrecursionlimit() < limit:
-        sys.setrecursionlimit(limit)
     k = np.log([2 + i for i in range(d)]) / np.log(2)
     t = benchmark(lambda: indices.find_approximate_threshold(k, m, nested=nested, accuracy=accuracy))
     assert np.abs(indices.nodeset_cardinality(k, t, nested=nested) - m) / m < accuracy, f"d={d}, m={m}"
@@ -52,9 +44,6 @@ def test_find_threshold_runtime(benchmark, d, m, nested):
     ],
 )
 def test_smolyak_coeffs_runtime(benchmark, d, t):
-    limit = d + 100
-    if sys.getrecursionlimit() < limit:
-        sys.setrecursionlimit(limit)
     k = np.log([2 + i for i in range(d)]) / np.log(2)
     iset = indices.indexset(k, t)
     rem_ts = [t - np.sum([nuj * k[j] for j, nuj in nu]) for nu in iset]

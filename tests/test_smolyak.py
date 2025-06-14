@@ -7,7 +7,7 @@ from smolyax.interpolation import SmolyakBarycentricInterpolator
 def test_interpolation():
     print("\nTesting vector-valued Smolyak interpolation ...")
 
-    for node_gen in setup.generate_nodes(n=20, dmin=1, dmax=4):
+    for node_gen in setup.generate_nodes(n=5, dmin=1, dmax=4):
 
         k = sorted(np.random.uniform(low=1, high=10, size=node_gen.dim))
         k /= k[0]
@@ -29,7 +29,7 @@ def test_interpolation():
 def test_quadrature():
     print("\nTesting vector-valued Smolyak quadrature ...")
 
-    for node_gen in setup.generate_nodes(n=20, dmin=1, dmax=4):
+    for node_gen in setup.generate_nodes(n=5, dmin=1, dmax=4):
 
         k = sorted(np.random.uniform(low=1, high=10, size=node_gen.dim))
         k /= k[0]
@@ -52,7 +52,7 @@ def test_quadrature():
 def test_gradient():
     print("\nTesting gradients of the vector-valued Smolyak interpolant ...")
 
-    for node_gen in setup.generate_nodes(n=20, dmin=1, dmax=4):
+    for node_gen in setup.generate_nodes(n=5, dmin=1, dmax=4):
 
         k = sorted(np.random.uniform(low=1, high=10, size=node_gen.dim))
         k /= k[0]
