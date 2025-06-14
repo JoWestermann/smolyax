@@ -266,7 +266,7 @@ class SmolyakBarycentricInterpolator:
         else:
             self.__compiled_gradient = jax.vmap(jax.jit(jax.jacrev(self.__call__)), in_axes=0)
 
-        if batchsize is not None :
+        if batchsize is not None:
             inputs = jax.random.uniform(jax.random.PRNGKey(0), (batchsize, self.__d_in))
             _ = self(inputs)
             _ = self.gradient(inputs)
