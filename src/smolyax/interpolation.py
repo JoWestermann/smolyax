@@ -74,7 +74,7 @@ class SmolyakBarycentricInterpolator:
         self.__zero = np.array([g(0)[0] for g in self.__node_gen])
 
         self.__compiled_tensor_product_evaluation = {}
-        self.__compiled_gradient = None
+        self.__compiled_tensor_product_gradient = {}
 
         if f is not None:
             self.set_f(f=f, batchsize=batchsize)
@@ -252,15 +252,23 @@ class SmolyakBarycentricInterpolator:
                 jax.jit(__evaluate_tensor_product_interpolant_wrapped), in_axes=(None, 0) + (0,) * (2 * n) + (0, 0)
             )
 
+        def __create_evaluate_tensor_product_gradient(n: int):
+            def __evaluate_tensor_product_gradient_wrapped(x, F, *args):
+                xi_list = args[:n]
+                w_list = args[n : 2 * n]
+                s_list = args[2 * n]
+                nu = args[2 * n + 1]
+                return barycentric.evaluate_tensor_product_gradient(x, F, xi_list, w_list, s_list, nu)
+
+            return jax.vmap(
+                jax.jit(__evaluate_tensor_product_gradient_wrapped), in_axes=(None, 0) + (0,) * (2 * n) + (0, 0)
+            )
+
         for n in self.n_2_F.keys():
             self.__compiled_tensor_product_evaluation[n] = __create_evaluate_tensor_product_interpolant(n)
+            self.__compiled_tensor_product_gradient[n] = __create_evaluate_tensor_product_gradient(n)
 
         _ = self(jax.random.uniform(jax.random.PRNGKey(0), (batchsize, self.__d_in)))
-
-        if self.d_out >= self.d_in:
-            self.__compiled_gradient = jax.vmap(jax.jit(jax.jacfwd(self.__call__)), in_axes=0)
-        else:
-            self.__compiled_gradient = jax.vmap(jax.jit(jax.jacrev(self.__call__)), in_axes=0)
 
     def __call__(self, x: Union[jax.Array, np.ndarray]) -> jax.Array:
         """@public
@@ -312,8 +320,24 @@ class SmolyakBarycentricInterpolator:
             Gradient of the interpolant evaluated at `x`.
             Shape: `(n_points, d_out, d_in)`.
         """
-        grad = self.__compiled_gradient(x)
-        return jnp.reshape(grad, (grad.shape[0],) + grad.shape[2:])
+        assert bool(self.__compiled_tensor_product_evaluation) == bool(
+            self.n_2_F
+        ), "The operator has not yet been compiled for a target function."
+        x = jnp.asarray(x)
+        if x.shape == (self.__d_in,):
+            x = x[None, :]
+        J_Lambda_x = jnp.zeros((x.shape[0], self.__d_out, self.__d_in))
+        for n in self.__compiled_tensor_product_gradient.keys():
+            res = self.__compiled_tensor_product_gradient[n](
+                x,
+                self.n_2_F[n],
+                *self.n_2_nodes[n],
+                *self.n_2_weights[n],
+                self.n_2_sorted_dims[n],
+                self.n_2_sorted_degs[n],
+            )
+            J_Lambda_x += jnp.tensordot(self.n_2_zetas[n], res, axes=(0, 0))
+        return J_Lambda_x
 
     def integral(self) -> jax.Array:
         """
