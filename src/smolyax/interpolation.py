@@ -240,17 +240,13 @@ class SmolyakBarycentricInterpolator:
 
     def __compile_for_batchsize(self, batchsize: int) -> None:
 
-        evaluate_b = barycentric.evaluate_basis_numerator_centered
-        if not (self.__zero == 0.0).all():
-            evaluate_b = barycentric.evaluate_basis_numerator_noncentered
-
         def __create_evaluate_tensor_product_interpolant(n: int):
             def __evaluate_tensor_product_interpolant_wrapped(x, F, *args):
                 xi_list = args[:n]
                 w_list = args[n : 2 * n]
                 s_list = args[2 * n]
                 nu = args[2 * n + 1]
-                return barycentric.evaluate_tensor_product_interpolant(x, evaluate_b, F, xi_list, w_list, s_list, nu)
+                return barycentric.evaluate_tensor_product_interpolant(x, F, xi_list, w_list, s_list, nu)
 
             return jax.vmap(
                 jax.jit(__evaluate_tensor_product_interpolant_wrapped), in_axes=(None, 0) + (0,) * (2 * n) + (0, 0)
