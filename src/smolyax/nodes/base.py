@@ -205,7 +205,8 @@ class Generator:
         Parameters
         ----------
         n : int, optional
-            Number of random points (default is 0, meaning one sample per dimension).
+            Number of random points. Both `n=0` and `n=1` will return a single point, the latter will add a separate
+            axis to be consistent with the return shape for multiple points. Default is `0`.
 
         Returns
         -------
