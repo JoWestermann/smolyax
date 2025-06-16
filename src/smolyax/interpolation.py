@@ -358,15 +358,43 @@ class SmolyakBarycentricInterpolator:
                 w_list = args[n : 2 * n]
                 s_list = args[2 * n]
                 nu = args[2 * n + 1]
-                return barycentric.evaluate_tensor_product_gradient(x, F, xi_list, w_list, s_list, nu)
+                zeta = args[2 * n + 2]
+                return barycentric.evaluate_tensor_product_gradient(x, F, xi_list, w_list, s_list, nu, zeta)
 
-            return jax.vmap(
-                jax.jit(__evaluate_tensor_product_gradient_wrapped), in_axes=(None, 0) + (0,) * (2 * n) + (0, 0)
-            )
+            return jax.vmap(jax.jit(__evaluate_tensor_product_gradient_wrapped), in_axes=(None, 0) + (0,) * (2 * n + 3))
+
+        def __create_evaluate_tensor_product_gradient_tree_jit_vmap(n: int):
+            def wrapped(x, F, *args):
+                xi_list = args[:n]
+                w_list = args[n : 2 * n]
+                s_list = args[2 * n]
+                nu = args[2 * n + 1]
+                zeta = args[2 * n + 2]
+
+                # Stack batch-major arrays
+                xi_list_stacked = [jnp.stack(xi) for xi in xi_list]
+                w_list_stacked = [jnp.stack(w) for w in w_list]
+
+                # vmap over batch dimension
+                vmapped_eval = jax.vmap(
+                    lambda F_i, xi_l, w_l, s_i, nu_i, zeta_i: barycentric.evaluate_tensor_product_gradient(
+                        x, F_i, xi_l, w_l, s_i, nu_i, zeta_i
+                    ),
+                    in_axes=(0, [0] * n, [0] * n, 0, 0, 0),
+                )
+
+                grad_array = vmapped_eval(F, xi_list_stacked, w_list_stacked, s_list, nu, zeta)
+
+                # Tree reduction over gradient arrays
+                total = jax.lax.associative_scan(lambda g1, g2: g1 + g2, grad_array)[-1]
+
+                return total
+
+            return jax.jit(wrapped)
 
         for n in self.n_2_F.keys():
             self.__compiled_tensor_product_evaluation[n] = __create_evaluate_tensor_product_interpolant_tree_jit_vmap(n)
-            self.__compiled_tensor_product_gradient[n] = __create_evaluate_tensor_product_gradient(n)
+            self.__compiled_tensor_product_gradient[n] = __create_evaluate_tensor_product_gradient_tree_jit_vmap(n)
 
         _ = self(jax.random.uniform(jax.random.PRNGKey(0), (batchsize, self.__d_in)))
 
@@ -428,15 +456,15 @@ class SmolyakBarycentricInterpolator:
             x = x[None, :]
         J_Lambda_x = jnp.zeros((x.shape[0], self.__d_out, self.__d_in))
         for n in self.__compiled_tensor_product_gradient.keys():
-            res = self.__compiled_tensor_product_gradient[n](
+            J_Lambda_x += self.__compiled_tensor_product_gradient[n](
                 x,
                 self.n_2_F[n],
                 *self.n_2_nodes[n],
                 *self.n_2_weights[n],
                 self.n_2_sorted_dims[n],
                 self.n_2_sorted_degs[n],
+                self.n_2_zetas[n],
             )
-            J_Lambda_x += jnp.tensordot(self.n_2_zetas[n], res, axes=(0, 0))
         return J_Lambda_x
 
     def integral(self) -> jax.Array:

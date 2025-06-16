@@ -163,6 +163,7 @@ def evaluate_tensor_product_gradient(
     w_list: Sequence[jax.Array],
     sorted_dims: Sequence[int],
     sorted_degs: Sequence[int],
+    zeta: int,
 ) -> jax.Array:
     """
     Evaluate the gradient of the tensor product interpolant using the barycentric formulation.
@@ -222,4 +223,4 @@ def evaluate_tensor_product_gradient(
     result = jnp.zeros((n_points, d_out, d_in))
     for i, si in enumerate(sorted_dims):
         result = result.at[:, :, si].set(F[:, :, i])
-    return result
+    return zeta * result
