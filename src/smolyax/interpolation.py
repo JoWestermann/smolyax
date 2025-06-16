@@ -246,11 +246,61 @@ class SmolyakBarycentricInterpolator:
                 w_list = args[n : 2 * n]
                 s_list = args[2 * n]
                 nu = args[2 * n + 1]
-                return barycentric.evaluate_tensor_product_interpolant(x, F, xi_list, w_list, s_list, nu)
+                zeta = args[2 * n + 2]
+                return barycentric.evaluate_tensor_product_interpolant(x, F, xi_list, w_list, s_list, nu, zeta)
 
             return jax.vmap(
-                jax.jit(__evaluate_tensor_product_interpolant_wrapped), in_axes=(None, 0) + (0,) * (2 * n) + (0, 0)
+                jax.jit(__evaluate_tensor_product_interpolant_wrapped), in_axes=(None, 0) + (0,) * (2 * n + 3)
             )
+
+        def __create_evaluate_tensor_product_interpolant_scan(n: int):
+            def wrapped(x, F, *args):
+                xi_list = args[:n]  # list of (n_batch, ...)
+                w_list = args[n : 2 * n]  # list of (n_batch, ...)
+                s_list = args[2 * n]  # (n_batch, ...)
+                nu = args[2 * n + 1]  # (n_batch, ...)
+                zeta = args[2 * n + 2]  # (n_batch, ...)
+
+                def scan_body(carry, args_i):
+                    F_i = args_i["F"]
+                    xi_list_i = [xi for xi in args_i["xi_list"]]
+                    w_list_i = [w for w in args_i["w_list"]]
+                    s_list_i = args_i["s_list"]
+                    nu_i = args_i["nu"]
+                    zeta_i = args_i["zeta"]
+
+                    val = barycentric.evaluate_tensor_product_interpolant(
+                        x, F_i, xi_list_i, w_list_i, s_list_i, nu_i, zeta_i
+                    )
+                    return carry + val, None
+
+                # Transpose to batch-major pytree
+                scan_inputs = jax.tree_util.tree_map(
+                    lambda *xs: jnp.stack(xs),
+                    *[
+                        {
+                            "F": F[i],
+                            "xi_list": [xi[i] for xi in xi_list],
+                            "w_list": [w[i] for w in w_list],
+                            "s_list": s_list[i],
+                            "nu": nu[i],
+                            "zeta": zeta[i],
+                        }
+                        for i in range(F.shape[0])
+                    ],
+                )
+
+                # Init
+                init = jnp.zeros_like(
+                    barycentric.evaluate_tensor_product_interpolant(
+                        x, F[0], [xi[0] for xi in xi_list], [w[0] for w in w_list], s_list[0], nu[0], zeta[0]
+                    )
+                )
+
+                total, _ = jax.lax.scan(scan_body, init, scan_inputs)
+                return total
+
+            return jax.jit(wrapped)
 
         def __create_evaluate_tensor_product_gradient(n: int):
             def __evaluate_tensor_product_gradient_wrapped(x, F, *args):
@@ -265,7 +315,7 @@ class SmolyakBarycentricInterpolator:
             )
 
         for n in self.n_2_F.keys():
-            self.__compiled_tensor_product_evaluation[n] = __create_evaluate_tensor_product_interpolant(n)
+            self.__compiled_tensor_product_evaluation[n] = __create_evaluate_tensor_product_interpolant_scan(n)
             self.__compiled_tensor_product_gradient[n] = __create_evaluate_tensor_product_gradient(n)
 
         _ = self(jax.random.uniform(jax.random.PRNGKey(0), (batchsize, self.__d_in)))
@@ -294,15 +344,15 @@ class SmolyakBarycentricInterpolator:
             x = x[None, :]
         I_Lambda_x = jnp.broadcast_to(self.offset, (x.shape[0], self.__d_out))
         for n in self.__compiled_tensor_product_evaluation.keys():
-            res = self.__compiled_tensor_product_evaluation[n](
+            I_Lambda_x += self.__compiled_tensor_product_evaluation[n](
                 x,
                 self.n_2_F[n],
                 *self.n_2_nodes[n],
                 *self.n_2_weights[n],
                 self.n_2_sorted_dims[n],
                 self.n_2_sorted_degs[n],
+                self.n_2_zetas[n],
             )
-            I_Lambda_x += jnp.tensordot(self.n_2_zetas[n], res, axes=(0, 0))
         return I_Lambda_x
 
     def gradient(self, x: Union[jax.Array, np.ndarray]) -> jax.Array:
