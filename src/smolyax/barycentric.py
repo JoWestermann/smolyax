@@ -121,9 +121,8 @@ def evaluate_basis_gradient_unnormalized(x: jax.Array, xi: jax.Array, w: jax.Arr
     r"""
     Evaluate the gradient of the barycentric basis numerator terms at given evaluation points.
 
-    Computes $w_j / (x - \xi_j)$ for indices $j \le \nu_i$; other entries are masked to zero.
-    If an evaluation point coincides with a node $\xi_j$ for $j \le \nu_i$, returns a one-hot indicator pattern
-    restricted to those entries.
+    Computes $-w_j / (x - \xi_j)^2$ for indices $j \le \nu_i$; other entries are masked to zero.
+    If an evaluation point coincides with a node $\xi_j$ for $j \le \nu_i$, returns `NaN` at that position.
 
     Parameters
     ----------
@@ -139,17 +138,15 @@ def evaluate_basis_gradient_unnormalized(x: jax.Array, xi: jax.Array, w: jax.Arr
 
     Returns
     -------
-    b : jax.Array
-        Gradient of the barycentric numerator terms for indices $j \le \nu_i$, or a one-hot indicator pattern if `x`
-        coincides with a node. Shape `(n_points, m_i)`.
+    jax.Array
+        Gradient values for indices $j \le \nu_i$, or `NaN` where `x` coincides with a node. Shape: `(n_points, m_i)`
     """
     diffs = (x - xi) ** 2
     mask_cols = jnp.arange(diffs.shape[1]) <= nu_i
-    mask_zero = jnp.any((diffs == 0) & mask_cols, axis=1)
-    one_hot_pattern = (diffs == 0).astype(diffs.dtype)
+    singular_mask = (diffs == 0) & mask_cols
     w_div_diffs = jnp.divide(-w, diffs)
-    db = jnp.where(mask_zero[:, None], one_hot_pattern, w_div_diffs)
-    return jnp.where(mask_cols[None, :], db, 0)
+    w_div_diffs = jnp.where(singular_mask, jnp.nan, w_div_diffs)
+    return jnp.where(mask_cols[None, :], w_div_diffs, 0)
 
 
 def evaluate_tensor_product_gradient(
