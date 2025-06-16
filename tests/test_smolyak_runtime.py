@@ -28,9 +28,7 @@ def setup_nodes(d: int, node_type: str, default_domain: bool) -> nodes.Generator
         if default_domain:
             return nodes.Leja(dim=d)
         else:
-            domain = np.zeros((d, 2))
-            domain[:, 1] = np.sort(np.random.rand(d) * 10)
-            domain[:, 0] = -domain[:, 1]
+            domain = np.sort(np.random.rand(d, 2), axis=1)
             return nodes.Leja(domains=domain)
     elif node_type == "gauss":
         if default_domain:

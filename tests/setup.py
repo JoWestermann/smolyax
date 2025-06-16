@@ -36,9 +36,7 @@ def generate_nodes(*, n: int, dmin: int, dmax: int) -> List[nodes.Generator]:
 
         d = np.random.randint(low=dmin, high=dmax + 1)
 
-        domain = np.zeros((d, 2))
-        domain[:, 1] = np.sort(np.random.rand(d) * 10)
-        domain[:, 0] = -domain[:, 1]
+        domain = np.sort(np.random.rand(d, 2), axis=1)
         sets.append(nodes.Leja(domains=domain))
 
         mean = np.random.randn(d)
