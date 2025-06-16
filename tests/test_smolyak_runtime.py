@@ -105,5 +105,5 @@ def test_smolyak_eval(benchmark, d, m, node_type, default_domain):
     t = indices.find_approximate_threshold(k, m, node_gen.is_nested)
     f = lambda x: target_f(x, 2.0, 2.0)
     smol = SmolyakBarycentricInterpolator(node_gen=node_gen, k=k, t=t, d_out=1, f=f)
-    x = np.random.randn(250, 1)
+    x = np.random.randn(250, d)
     benchmark(lambda: smol(x))

@@ -297,6 +297,7 @@ class SmolyakBarycentricInterpolator:
         x = jnp.asarray(x)
         if x.shape == (self.__d_in,):
             x = x[None, :]
+        assert x.shape[1] == self.__d_in, f"{x.shape[1]} != {self.__d_in}"
         I_Lambda_x = jnp.broadcast_to(self.offset, (x.shape[0], self.__d_out))
         for n in self.__compiled_tensor_product_evaluation.keys():
             res = self.__compiled_tensor_product_evaluation[n](
@@ -331,6 +332,7 @@ class SmolyakBarycentricInterpolator:
         x = jnp.asarray(x)
         if x.shape == (self.__d_in,):
             x = x[None, :]
+        assert x.shape[1] == self.__d_in, f"{x.shape[1]} != {self.__d_in}"
         J_Lambda_x = jnp.zeros((x.shape[0], self.__d_out, self.__d_in))
         for n in self.__compiled_tensor_product_gradient.keys():
             res = self.__compiled_tensor_product_gradient[n](
