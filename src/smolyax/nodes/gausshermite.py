@@ -4,19 +4,16 @@ from typing import Union
 import jax
 import numpy as np
 
-from .base import Generator, GeneratorMultiD
+from .base import Generator, Generator1D
 
 
-class GaussHermite1D(Generator):
-    """Generator for Gauss-Hermite points, a non-nested node sequence on the real line."""
+class GaussHermite1D(Generator1D):
+    """
+    Generator for one-dimensional Gauss-Hermite nodes.
 
-    @property
-    def mean(self) -> float:
-        return self.__mean
-
-    @property
-    def scaling(self) -> float:
-        return self.__scaling
+    Provides Gauss-Hermite quadrature nodes and weights on the real line, with optional scaling and shifting to custom
+    domains.
+    """
 
     def __init__(self, mean: float = 0.0, scaling: float = 1.0) -> None:
         """
@@ -29,14 +26,33 @@ class GaussHermite1D(Generator):
         scaling : float, optional
             Scaling of the node sequence. Default is 1.0.
         """
-        super().__init__(dim=1, is_nested=False)
+        super().__init__(is_nested=False)
         self.__mean = mean
         self.__scaling = scaling
         self.__cached_call = self.__make_cached_call()
         self.__cached_get_quadrature_weights = self.__make_cached_get_quadrature_weights()
 
-    def __repr__(self) -> str:
-        return f"Gauss-Hermite (mean = {self.__mean}, scaling = {self.__scaling})"
+    @property
+    def mean(self) -> float:
+        """
+        Center of the node sequence.
+
+        Returns
+        -------
+        float
+        """
+        return self.__mean
+
+    @property
+    def scaling(self) -> float:
+        """
+        Scaling factor of the node sequence.
+
+        Returns
+        -------
+        float
+        """
+        return self.__scaling
 
     def __make_cached_call(self):
         @lru_cache(maxsize=None)
@@ -46,6 +62,20 @@ class GaussHermite1D(Generator):
         return cached
 
     def __call__(self, n: int) -> Union[jax.Array, np.ndarray]:
+        """@public
+        Generate the Gauss-Hermite node sequence of length `n+1`, scaled and shifted according to `self.scaling` and
+        `self.mean`.
+
+        Parameters
+        ----------
+        n : int
+            Maximal node index (counting starts at `0`).
+
+        Returns
+        -------
+        jax.Array or np.ndarray
+            Scaled Gauss-Hermite nodes.
+        """
         return self.__cached_call(n)
 
     @staticmethod
@@ -56,21 +86,89 @@ class GaussHermite1D(Generator):
 
         return cached
 
-    def get_quadrature_weights(self, n: int) -> Union[jax.Array, np.ndarray]:
-        return self.__cached_get_quadrature_weights(n)
-
     def scale(self, x: Union[jax.Array, np.ndarray]) -> Union[jax.Array, np.ndarray]:
+        """
+        Map nodes or points from the reference domain (corresponding to `mean=0` and `scaling=1`) to the custom domain.
+
+        Parameters
+        ----------
+        x : jax.Array or np.ndarray
+            Reference domain nodes or points.
+
+        Mainly intended for internal use and testing.
+
+        Returns
+        -------
+        jax.Array or np.ndarray
+            Scaled nodes or points.
+        """
         return self.__mean + self.__scaling * x
 
     def scale_back(self, x: Union[jax.Array, np.ndarray]) -> Union[jax.Array, np.ndarray]:
+        """
+        Map nodes or points from the custom domain back to the reference domain (corresponding to `mean=0` and
+        `scaling=1`) .
+
+        Mainly intended for internal use and testing.
+
+        Parameters
+        ----------
+        x : jax.Array or np.ndarray
+            Nodes or points in the custom domain.
+
+        Returns
+        -------
+        jax.Array or np.ndarray
+            Nodes or points in the reference domain.
+        """
         return (x - self.__mean) / self.__scaling
 
     def get_random(self, n: int = 1) -> Union[jax.Array, np.ndarray]:
+        r"""
+        Sample random points $x \sim \mathcal{N}(\mu, \frac{\sigma}{2})$, where $\mu$ = `self.mean` and
+        $\sigma$ = `self.scaling`.
+
+        The factor $\frac{1}{2}$ ensures that for $\mu=0$ and $\sigma=1$ we sample from the Gaussian measure with
+        density $f(x) = \frac{1}{\sqrt{\pi}} exp(-x^2)$, which is the measure of integration for classical
+        Gauss-Hermite quadrature.
+
+        Parameters
+        ----------
+        n : int, optional
+            Number of random points to sample (default is 1).
+
+        Returns
+        -------
+        jax.Array or np.ndarray
+            Randomly sampled points.
+        """
         return self.scale(np.random.randn(n) / np.sqrt(2))
 
+    def get_quadrature_weights(self, n: int) -> Union[jax.Array, np.ndarray]:
+        """
+        Return quadrature weights for Gauss-Hermite nodes.
 
-class GaussHermite(GeneratorMultiD):
-    """Multidimensional Gauss-Hermite node generator."""
+        Parameters
+        ----------
+        n : int
+            Maximal node index (counting starts at `0`).
+
+        Returns
+        -------
+        jax.Array or np.ndarray
+            Weights corresponding to the first `n+1` nodes.
+        """
+        return self.__cached_get_quadrature_weights(n)
+
+    def __repr__(self) -> str:
+        return f"Gauss-Hermite (mean = {self.__mean}, scaling = {self.__scaling})"
+
+
+class GaussHermite(Generator):
+    """
+    Container for multiple 1D Gauss-Hermite node sequences generators with optional scaling and shifting in each
+    dimension.
+    """
 
     def __init__(
         self, mean: Union[jax.Array, np.ndarray] = None, scaling: Union[jax.Array, np.ndarray] = None, dim: int = None
@@ -106,16 +204,48 @@ class GaussHermite(GeneratorMultiD):
         if scaling is None:
             scaling = np.ones(dim)
 
-        GeneratorMultiD.__init__(self, [GaussHermite1D(m, a) for m, a in zip(mean, scaling)])
+        Generator.__init__(self, [GaussHermite1D(m, a) for m, a in zip(mean, scaling)])
 
         self.__mean = np.asarray(mean)
         self.__scaling = np.asarray(scaling)
 
-    def __repr__(self) -> str:
-        return f"Gauss Hermite (d = {self.dim}, mean = {self.__mean.tolist()}, scaling = {self.__scaling.tolist()})"
-
     def scale(self, x: Union[jax.Array, np.ndarray]) -> Union[jax.Array, np.ndarray]:
+        """
+        Map multidimensional points from the reference domain (corresponding to `mean=0` and `scaling=1` in each
+        dimension) to the custom domain.
+
+        Mainly intended for internal use and testing.
+
+        Parameters
+        ----------
+        x : jax.Array or np.ndarray
+            Nodes or points in reference domain.
+
+        Returns
+        -------
+        jax.Array or np.ndarray
+            Nodes or points in custom domain.
+        """
         return self.__mean + self.__scaling * x
 
     def scale_back(self, x: Union[jax.Array, np.ndarray]) -> Union[jax.Array, np.ndarray]:
+        """
+        Map multidimensional points from the custom domain back to the reference domain (corresponding to `mean=0` and
+        `scaling=1` in each dimension).
+
+        Mainly intended for internal use and testing.
+
+        Parameters
+        ----------
+        x : jax.Array or np.ndarray
+            Nodes or points in custom domain.
+
+        Returns
+        -------
+        jax.Array or np.ndarray
+            Nodes or points in reference domain.
+        """
         return (x - self.__mean) / self.__scaling
+
+    def __repr__(self) -> str:
+        return f"Gauss Hermite (d = {self.dim}, mean = {self.__mean.tolist()}, scaling = {self.__scaling.tolist()})"
