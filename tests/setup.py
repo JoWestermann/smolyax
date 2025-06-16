@@ -36,9 +36,7 @@ def generate_nodes(*, n: int, dmin: int, dmax: int) -> List[nodes.Generator]:
 
         d = np.random.randint(low=dmin, high=dmax + 1)
 
-        domain = np.zeros((d, 2))
-        domain[:, 1] = np.sort(np.random.rand(d) * 10)
-        domain[:, 0] = -domain[:, 1]
+        domain = np.sort(np.random.rand(d, 2), axis=1)
         sets.append(nodes.Leja(domains=domain))
 
         mean = np.random.randn(d)
@@ -48,7 +46,7 @@ def generate_nodes(*, n: int, dmin: int, dmax: int) -> List[nodes.Generator]:
     return sets
 
 
-def evaluate_univariate_polynomial(node_gen_uni: nodes.Generator, degree: int, x: np.ndarray) -> ArrayLike:
+def evaluate_univariate_polynomial(node_gen_uni: nodes.Generator1D, degree: int, x: np.ndarray) -> ArrayLike:
     x = node_gen_uni.scale_back(x)
     coefficients = [0] * degree + [1]
     if isinstance(node_gen_uni, nodes.Leja1D):
@@ -59,7 +57,7 @@ def evaluate_univariate_polynomial(node_gen_uni: nodes.Generator, degree: int, x
         raise TypeError(f"Unsupported node generator type: {type(node_gen_uni)}")
 
 
-def differentiate_univariate_polynomial(node_gen_uni: nodes.Generator, degree: int, x: np.ndarray) -> ArrayLike:
+def differentiate_univariate_polynomial(node_gen_uni: nodes.Generator1D, degree: int, x: np.ndarray) -> ArrayLike:
     x = node_gen_uni.scale_back(x)
     coefficients = [0] * degree + [1]
     if isinstance(node_gen_uni, nodes.Leja1D):

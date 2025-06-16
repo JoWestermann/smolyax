@@ -34,7 +34,7 @@ class SmolyakBarycentricInterpolator:
         t: float,
         d_out: int,
         f: Callable[[Union[jax.Array, np.ndarray]], Union[jax.Array, np.ndarray]] = None,
-        batchsize: int = 250,
+        batchsize: int = None,
     ) -> None:
         """
         Initialize the Smolyak Barycentric Interpolator.
@@ -53,8 +53,9 @@ class SmolyakBarycentricInterpolator:
             Target function to interpolate. While `f` can be passed at construction time, for a better control over, and
             potential reuse of, function evaluations consider calling [`set_f()`](#SmolyakBarycentricInterpolator.set_f)
             *after* construction.
-        batchsize : int, default=250
-            Anticipated batch size of the interpolator input, used for pre-compiling the `__call__` method.
+        batchsize : int, default=None
+            Expected batch size of the interpolator input, used to pre-compile the `__call__` method via a warm-up call.
+            If `batchsize` is `None`, the warm-up is skipped.
         """
         self.__d_in = len(k)
         self.__d_out = d_out
@@ -162,7 +163,7 @@ class SmolyakBarycentricInterpolator:
         *,
         f: Callable[[Union[jax.Array, np.ndarray]], Union[jax.Array, np.ndarray]],
         f_evals: dict[tuple, dict[tuple, jax.Array]] = None,
-        batchsize: int = 250,
+        batchsize: int = None,
     ) -> dict[tuple, dict[tuple, jax.Array]]:
         """
         Compute (or reuse pre-computed) evaluations of the target function `f` at the interpolation nodes of the
@@ -175,8 +176,9 @@ class SmolyakBarycentricInterpolator:
         f_evals : dict, optional
             A dictionary mapping interpolation nodes to function evaluations.
             If provided, these evaluations will be reused.
-        batchsize : int, default=250
-            Anticipated batch size of the interpolator input, used for pre-compiling the `__call__` method.
+        batchsize : int, default=None
+            Expected batch size of the interpolator input, used to pre-compile the `__call__` method via a warm-up call.
+            If `batchsize` is `None`, the warm-up is skipped.
 
         Returns
         -------
@@ -268,7 +270,10 @@ class SmolyakBarycentricInterpolator:
             self.__compiled_tensor_product_evaluation[n] = __create_evaluate_tensor_product_interpolant(n)
             self.__compiled_tensor_product_gradient[n] = __create_evaluate_tensor_product_gradient(n)
 
-        _ = self(jax.random.uniform(jax.random.PRNGKey(0), (batchsize, self.__d_in)))
+        if batchsize is not None:
+            inputs = jax.random.uniform(jax.random.PRNGKey(0), (batchsize, self.__d_in))
+            _ = self(inputs)
+            _ = self.gradient(inputs)
 
     def __call__(self, x: Union[jax.Array, np.ndarray]) -> jax.Array:
         """@public
