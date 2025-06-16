@@ -147,9 +147,9 @@ def evaluate_basis_gradient_unnormalized(x: jax.Array, xi: jax.Array, w: jax.Arr
     mask_cols = jnp.arange(diffs.shape[1]) <= nu_i
     mask_zero = jnp.any((diffs == 0) & mask_cols, axis=1)
     one_hot_pattern = (diffs == 0).astype(diffs.dtype)
-    w_div_diffs = jnp.divide(w, diffs)
-    b = jnp.where(mask_zero[:, None], one_hot_pattern, w_div_diffs)
-    return jnp.where(mask_cols[None, :], b, 0)
+    w_div_diffs = jnp.divide(-w, diffs)
+    db = jnp.where(mask_zero[:, None], one_hot_pattern, w_div_diffs)
+    return jnp.where(mask_cols[None, :], db, 0)
 
 
 def evaluate_tensor_product_gradient(
@@ -206,7 +206,7 @@ def evaluate_tensor_product_gradient(
         db_norm = jnp.sum(db, axis=1)[:, None]
 
         b = b / b_norm
-        B_i = b * db_norm / b_norm - db / b_norm
+        B_i = db / b_norm - b * db_norm / b_norm
         B = jnp.tile(b[:, None, :], (1, n, 1))
         B = B.at[:, i, :].set(B_i)
 
