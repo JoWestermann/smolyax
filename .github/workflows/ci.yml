@@ -14,7 +14,7 @@ jobs:
       - name: Install dependencies
         run: pip install .[dev]
       - name: Run Tests
-        run: pytest tests/
+        run: pytest --benchmark-disable tests/
       # - name: Run Type Checking (pytype)
         # run: pytype
       - name: Run Linter (flake8)
