@@ -302,6 +302,56 @@ class SmolyakBarycentricInterpolator:
 
             return jax.jit(wrapped)
 
+        def __create_evaluate_tensor_product_interpolant_tree(n: int):
+            def wrapped(x, F, *args):
+                xi_list = args[:n]
+                w_list = args[n : 2 * n]
+                s_list = args[2 * n]
+                nu = args[2 * n + 1]
+                zeta = args[2 * n + 2]
+
+                # Compute val for each batch element
+                val_list = [
+                    barycentric.evaluate_tensor_product_interpolant(
+                        x, F[i], [xi[i] for xi in xi_list], [w[i] for w in w_list], s_list[i], nu[i], zeta[i]
+                    )
+                    for i in range(F.shape[0])
+                ]
+
+                val_array = jnp.stack(val_list)
+
+                # Tree reduction
+                total_prefixes = jax.lax.associative_scan(lambda x, y: x + y, val_array)
+
+                return total_prefixes[-1]
+
+            return wrapped
+
+        def __create_evaluate_tensor_product_interpolant_tree_jit_vmap(n: int):
+            def wrapped(x, F, *args):
+                xi_list = args[:n]
+                w_list = args[n : 2 * n]
+                s_list = args[2 * n]
+                nu = args[2 * n + 1]
+                zeta = args[2 * n + 2]
+
+                # Build batch-major lists
+                xi_list_stacked = [jnp.stack(xi) for xi in xi_list]
+                w_list_stacked = [jnp.stack(w) for w in w_list]
+
+                vmapped_eval = jax.vmap(
+                    lambda F_i, xi_l, w_l, s_i, nu_i, zeta_i: barycentric.evaluate_tensor_product_interpolant(
+                        x, F_i, xi_l, w_l, s_i, nu_i, zeta_i
+                    ),
+                    in_axes=(0, [0] * n, [0] * n, 0, 0, 0),
+                )
+
+                val_array = vmapped_eval(F, xi_list_stacked, w_list_stacked, s_list, nu, zeta)
+                total = jax.lax.associative_scan(lambda x, y: x + y, val_array)[-1]
+                return total
+
+            return jax.jit(wrapped)
+
         def __create_evaluate_tensor_product_gradient(n: int):
             def __evaluate_tensor_product_gradient_wrapped(x, F, *args):
                 xi_list = args[:n]
@@ -315,7 +365,7 @@ class SmolyakBarycentricInterpolator:
             )
 
         for n in self.n_2_F.keys():
-            self.__compiled_tensor_product_evaluation[n] = __create_evaluate_tensor_product_interpolant_scan(n)
+            self.__compiled_tensor_product_evaluation[n] = __create_evaluate_tensor_product_interpolant_tree_jit_vmap(n)
             self.__compiled_tensor_product_gradient[n] = __create_evaluate_tensor_product_gradient(n)
 
         _ = self(jax.random.uniform(jax.random.PRNGKey(0), (batchsize, self.__d_in)))
