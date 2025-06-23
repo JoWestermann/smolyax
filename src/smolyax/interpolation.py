@@ -274,7 +274,7 @@ class SmolyakBarycentricInterpolator:
             _ = self(inputs)
             _ = self.gradient(inputs)
 
-    def __call__(self, x: Union[jax.Array, np.ndarray]) -> jax.Array:
+    def __call__(self, x: Union[jax.Array, np.ndarray], memory_max_GB: float = 4.0) -> jax.Array:
         """@public
         Evaluate the Smolyak operator at points `x`.
 
@@ -284,6 +284,9 @@ class SmolyakBarycentricInterpolator:
             Points at which to evaluate the Smolyak interpolant of the target function `f`.
             Shape: `(n_points, d_in)` or `(d_in,)`, where `n_points` is the number of evaluation points
             and `d_in` is the dimension of the input domain.
+        memory_max_GB : float, optional
+            Maximum memory in gigabytes to use during batched evaluation. Controls the batch size
+            to stay within this memory limit. Default is 4.0.
 
         Returns
         -------
@@ -297,28 +300,45 @@ class SmolyakBarycentricInterpolator:
         if x.shape == (self.__d_in,):
             x = x[None, :]
         assert x.shape[1] == self.__d_in, f"{x.shape[1]} != {self.__d_in}"
+
         I_Lambda_x = jnp.broadcast_to(self.offset, (x.shape[0], self.__d_out))
+
         for n in self.__compiled_tensor_product_evaluation.keys():
-            res = self.__compiled_tensor_product_evaluation[n](
-                x,
-                self.n_2_F[n],
-                *self.n_2_nodes[n],
-                *self.n_2_weights[n],
-                self.n_2_sorted_dims[n],
-                self.n_2_sorted_degs[n],
-                self.n_2_zetas[n],
-            )
-            I_Lambda_x += jnp.sum(res, axis=0)
+
+            # determine the number of batches that ensures that the computation stays within the given memory limit
+            n_terms = self.n_2_F[n].shape[0]
+            memory_per_term_GB = I_Lambda_x.size * np.prod(self.n_2_F[n].shape[3:]) * 8 / (1024**3)
+            batch_size = max(1, int(np.floor(memory_max_GB / memory_per_term_GB)))
+            n_batches = int(np.ceil(n_terms / batch_size))
+
+            # batched processing of tensor product interpolants with n active dimensions
+            for i in range(n_batches):
+                start = i * batch_size
+                end = min((i + 1) * batch_size, n_terms)
+                res = self.__compiled_tensor_product_evaluation[n](
+                    x,
+                    self.n_2_F[n][start:end],
+                    *[arr[start:end] for arr in self.n_2_nodes[n]],
+                    *[arr[start:end] for arr in self.n_2_weights[n]],
+                    self.n_2_sorted_dims[n][start:end],
+                    self.n_2_sorted_degs[n][start:end],
+                    self.n_2_zetas[n][start:end],
+                )
+                I_Lambda_x += jnp.sum(res, axis=0)
+
         return I_Lambda_x
 
-    def gradient(self, x: Union[jax.Array, np.ndarray]) -> jax.Array:
+    def gradient(self, x: Union[jax.Array, np.ndarray], memory_max_GB: float = 4.0) -> jax.Array:
         """
         Compute the gradient of the Smolyak interpolant at the given points.
 
         Parameters
         ----------
         x : Union[jax.Array, numpy.ndarray]
-            Points at which to evaluate the gradient. Shape: `(n_points, d_in)`
+            Points at which to evaluate the gradient. Shape: `(n_points, d_in)`.
+        memory_max_GB : float, optional
+            Maximum memory in gigabytes to use during batched evaluation. Controls the batch size
+            to stay within this memory limit. Default is 4.0.
 
         Returns
         -------
@@ -333,18 +353,32 @@ class SmolyakBarycentricInterpolator:
         if x.shape == (self.__d_in,):
             x = x[None, :]
         assert x.shape[1] == self.__d_in, f"{x.shape[1]} != {self.__d_in}"
+
         J_Lambda_x = jnp.zeros((x.shape[0], self.__d_out, self.__d_in))
+
         for n in self.__compiled_tensor_product_gradient.keys():
-            res = self.__compiled_tensor_product_gradient[n](
-                x,
-                self.n_2_F[n],
-                *self.n_2_nodes[n],
-                *self.n_2_weights[n],
-                self.n_2_sorted_dims[n],
-                self.n_2_sorted_degs[n],
-                self.n_2_zetas[n],
-            )
-            J_Lambda_x += jnp.sum(res, axis=0)
+
+            # determine the number of batches that ensures that the computation stays within the given memory limit
+            n_terms = self.n_2_F[n].shape[0]
+            memory_per_term_GB = J_Lambda_x.size * np.prod(self.n_2_F[n].shape[3:]) * 8 / (1024**3)
+            batch_size = max(1, int(np.floor(memory_max_GB / memory_per_term_GB)))
+            n_batches = int(np.ceil(n_terms / batch_size))
+
+            # batched processing of tensor product gradients with n active dimensions
+            for i in range(n_batches):
+                start = i * batch_size
+                end = min((i + 1) * batch_size, n_terms)
+                res = self.__compiled_tensor_product_gradient[n](
+                    x,
+                    self.n_2_F[n][start:end],
+                    *[arr[start:end] for arr in self.n_2_nodes[n]],
+                    *[arr[start:end] for arr in self.n_2_weights[n]],
+                    self.n_2_sorted_dims[n][start:end],
+                    self.n_2_sorted_degs[n][start:end],
+                    self.n_2_zetas[n][start:end],
+                )
+                J_Lambda_x += jnp.sum(res, axis=0)
+
         return J_Lambda_x
 
     def integral(self) -> jax.Array:
