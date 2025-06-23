@@ -87,7 +87,6 @@ class SmolyakBarycentricInterpolator:
         #   - self.n_f_evals tracks the total number of function evaluations used by the interpolator
         #   - self.n_f_evals_new counts only new function calls.
         # If evaluations are reused across interpolator instances, then likely self.n_f_evals_new < self.n_f_evals
-
         self.n_f_evals = indices.nodeset_cardinality(k, t, nested=self.__is_nested)
         self.n_f_evals_new = 0
 
@@ -248,10 +247,11 @@ class SmolyakBarycentricInterpolator:
                 w_list = args[n : 2 * n]
                 s_list = args[2 * n]
                 nu = args[2 * n + 1]
-                return barycentric.evaluate_tensor_product_interpolant(x, F, xi_list, w_list, s_list, nu)
+                zeta = args[2 * n + 2]
+                return barycentric.evaluate_tensor_product_interpolant(x, F, xi_list, w_list, s_list, nu, zeta)
 
             return jax.vmap(
-                jax.jit(__evaluate_tensor_product_interpolant_wrapped), in_axes=(None, 0) + (0,) * (2 * n) + (0, 0)
+                jax.jit(__evaluate_tensor_product_interpolant_wrapped), in_axes=(None, 0) + (0,) * (2 * n + 3)
             )
 
         def __create_evaluate_tensor_product_gradient(n: int):
@@ -260,11 +260,10 @@ class SmolyakBarycentricInterpolator:
                 w_list = args[n : 2 * n]
                 s_list = args[2 * n]
                 nu = args[2 * n + 1]
-                return barycentric.evaluate_tensor_product_gradient(x, F, xi_list, w_list, s_list, nu)
+                zeta = args[2 * n + 2]
+                return barycentric.evaluate_tensor_product_gradient(x, F, xi_list, w_list, s_list, nu, zeta)
 
-            return jax.vmap(
-                jax.jit(__evaluate_tensor_product_gradient_wrapped), in_axes=(None, 0) + (0,) * (2 * n) + (0, 0)
-            )
+            return jax.vmap(jax.jit(__evaluate_tensor_product_gradient_wrapped), in_axes=(None, 0) + (0,) * (2 * n + 3))
 
         for n in self.n_2_F.keys():
             self.__compiled_tensor_product_evaluation[n] = __create_evaluate_tensor_product_interpolant(n)
@@ -307,8 +306,9 @@ class SmolyakBarycentricInterpolator:
                 *self.n_2_weights[n],
                 self.n_2_sorted_dims[n],
                 self.n_2_sorted_degs[n],
+                self.n_2_zetas[n],
             )
-            I_Lambda_x += jnp.tensordot(self.n_2_zetas[n], res, axes=(0, 0))
+            I_Lambda_x += jnp.sum(res, axis=0)
         return I_Lambda_x
 
     def gradient(self, x: Union[jax.Array, np.ndarray]) -> jax.Array:
@@ -342,8 +342,9 @@ class SmolyakBarycentricInterpolator:
                 *self.n_2_weights[n],
                 self.n_2_sorted_dims[n],
                 self.n_2_sorted_degs[n],
+                self.n_2_zetas[n],
             )
-            J_Lambda_x += jnp.tensordot(self.n_2_zetas[n], res, axes=(0, 0))
+            J_Lambda_x += jnp.sum(res, axis=0)
         return J_Lambda_x
 
     def integral(self) -> jax.Array:

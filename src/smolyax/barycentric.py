@@ -72,6 +72,7 @@ def evaluate_tensor_product_interpolant(
     w_list: Sequence[jax.Array],
     sorted_dims: Sequence[int],
     sorted_degs: Sequence[int],
+    zeta: int,
 ) -> jax.Array:
     """
     Evaluate the tensor product interpolant using the barycentric formulation.
@@ -100,6 +101,9 @@ def evaluate_tensor_product_interpolant(
     sorted_degs : Sequence[int]
         Interpolation degrees per dimension.
 
+    zeta : int
+        Smolyak coefficient.
+
     Returns
     -------
     jax.Array
@@ -114,7 +118,7 @@ def evaluate_tensor_product_interpolant(
         else:
             F = jnp.einsum("ij,ikj...->ik...", b, F)
         norm *= jnp.sum(b, axis=1)
-    return F / norm[:, None]
+    return zeta * F / norm[:, None]
 
 
 def evaluate_basis_gradient_unnormalized(x: jax.Array, xi: jax.Array, w: jax.Array, nu_i: int) -> jax.Array:
@@ -156,6 +160,7 @@ def evaluate_tensor_product_gradient(
     w_list: Sequence[jax.Array],
     sorted_dims: Sequence[int],
     sorted_degs: Sequence[int],
+    zeta: int,
 ) -> jax.Array:
     """
     Evaluate the gradient of the tensor product interpolant using the barycentric formulation.
@@ -183,6 +188,9 @@ def evaluate_tensor_product_gradient(
 
     sorted_degs : Sequence[int]
         Interpolation degrees per dimension.
+
+    zeta : int
+        Smolyak coefficient.
 
     Returns
     -------
@@ -215,4 +223,4 @@ def evaluate_tensor_product_gradient(
     result = jnp.zeros((n_points, d_out, d_in))
     for i, si in enumerate(sorted_dims):
         result = result.at[:, :, si].set(F[:, :, i])
-    return result
+    return zeta * result
