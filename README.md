@@ -38,8 +38,14 @@ numba
 
 ### Installation
 
+To install `smolyax` and its dependencies, run:
 ```
 pip install git+https://github.com/JoWestermann/smolyax.git
+```
+
+For enabling GPU computation run additionally:
+```
+pip install "jax[cuda]"
 ```
 
 ### Usage
@@ -83,18 +89,28 @@ and that we will work on prioritized on demand via our
 [open issues](https://github.com/JoWestermann/smolyax/issues?q=is%3Aissue%20state%3Aopen%20label%3Aenhancement).
 
 ### Submit a feature!
-If you want to submit a feature, please do so via a pull request. Ensure that all tests run through by running
+To develop new features or make changes, install `smolyax` with its developer dependencies.
+```
+git clone git@github.com:JoWestermann/smolyax.git
+pip install -e "smolyax[dev]"
+```
+While working on your change, make sure all tests pass:
 ```
 pytest
 ```
-from the project root directory, and ensure that performance has not degraded by first creating a benchmark on the main branch via
+Verify that performance hasn’t regressed. First create a baseline on the main branch:
 ```
 pytest --benchmark-only --benchmark-save=baseline
 ```
-and compare performance on your feature branch against this baseline via
+Then compare your feature branch against the baseline:
 ```
 pytest --benchmark-only --benchmark-compare=0001_baseline --benchmark-sort=name --benchmark-compare-fail=min:5%
 ```
+Make sure to update the documentation:
+```
+pdoc src/smolyax --math --docformat numpy -o docs
+```
+Submit your feature via a pull request.
 
 ## Cite
 

@@ -12,23 +12,23 @@ authors = [
 ]
 license = { text = "MIT" }
 dependencies = [
-    "jax",
-    "numba",
+    "jax >= 0.6.2",
+    "numba >= 0.61.2",
 ]
 requires-python = ">=3.11"
 
 [project.optional-dependencies]
 dev = [
-    "pytest",
-    "pytest-benchmark",
-    "pytype",
-    "black",
-    "flake8",
-    "flake8-pyproject",
-    "pdoc",
-    "mypy",
-    "ipykernel",
-    "matplotlib"
+    "pytest >= 8.4.1",
+    "pytest-benchmark >= 5.1.0",
+    "pytype >= 2024.10.11",
+    "black >= 25.1.0",
+    "flake8 >= "7.3.0,
+    "flake8-pyproject >= 1.2.3",
+    "pdoc >= 15.0.4",
+    "mypy >= 1.16.1",
+    "ipykernel >= 6.29.5",
+    "matplotlib >= 3.10.3"
 ]
 
 [tool.black]
