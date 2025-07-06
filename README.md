@@ -71,6 +71,9 @@ in particular see the examples for interpolating a
 [two-dimensional](https://github.com/JoWestermann/smolyax/blob/main/notebooks/smolyak_interpolation_2D.ipynb)
 or [high-dimensional function](https://github.com/JoWestermann/smolyax/blob/main/notebooks/smolyak_interpolation_high_D.ipynb).
 
+### Help
+
+If you have questions or need help, please reach out through our [Github Discussions](https://github.com/JoWestermann/smolyax/discussions)!
 
 ## Contribute
 
