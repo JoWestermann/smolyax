@@ -67,9 +67,9 @@ y = f_ip(x)
 
 For more examples and visualizations see [notebooks](https://github.com/JoWestermann/smolyax/tree/main/notebooks),
 in particular see the examples for interpolating a
-[one-dimensional](https://github.com/JoWestermann/smolyax/blob/main/notebooks/smolyak_example_1D.ipynb),
-[two-dimensional](https://github.com/JoWestermann/smolyax/blob/main/notebooks/smolyak_example_2D.ipynb)
-or [high-dimensional function](https://github.com/JoWestermann/smolyax/blob/main/notebooks/smolyak_example_high_D.ipynb).
+[one-dimensional](https://github.com/JoWestermann/smolyax/blob/main/notebooks/smolyak_interpolation_1D.ipynb),
+[two-dimensional](https://github.com/JoWestermann/smolyax/blob/main/notebooks/smolyak_interpolation_2D.ipynb)
+or [high-dimensional function](https://github.com/JoWestermann/smolyax/blob/main/notebooks/smolyak_interpolation_high_D.ipynb).
 
 
 ## Contribute
