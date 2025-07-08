@@ -58,9 +58,9 @@ The `smolyax` interpolant provides further functionality to evaluate its gradien
 
 Polynomial expansion is a well-studied and powerful tool in applied mathematics, with important applications in surrogate modeling, uncertainty quantification and inverse problems, see e.g. [@adcock:2022; @dung:2023; @zech:2018; @chkifa:2015; @herrmann:2024; @westermann:2025] and references therein.
 
-Smolyak interpolation offers a practical way to construct polynomial approximations with known error bounds for a wide range of function classes, see e.g. [@barthelmann:2000; @chkifa:2015].
+Smolyak interpolation offers a practical way to construct polynomial approximations with known error bounds for a wide range of function classes, see e.g. [@barthelmann:2000; @chkifa:2015; @adcock:2022].
 
-While several libraries provide high-dimensional interpolation functionality, none, to our knowledge, provides a hardware-agnostic, high performance implementation. `smolyax` addresses this gap by providing an efficient solution within the popular JAX ecosystem.
+While several libraries provide high-dimensional interpolation functionality, see e.g. [@marelli:2014; @piazzola:2024; @jakeman:2023; @parno:2021], none, to our knowledge, provides a both CPU- and GPU-compatible, high performance implementation of the Smolyak interpolation operator. `smolyax` addresses this gap by providing an efficient solution within the popular JAX ecosystem.
 
 # A vectorizable implementation of the Smolyak operator
 
