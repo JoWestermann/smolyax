@@ -239,7 +239,7 @@ class Leja(Generator):
             self.__domains = np.asarray(domains)
             self.__reference_domains = np.array([[-1, 1]] * len(domains))
         elif dim is not None:
-            Generator.__init__(self, [Leja1D() for _ in range(dim)])
+            Generator.__init__(self, [Leja1D()] * dim)
         else:
             raise ValueError("Must specify one of 'domains' or 'dim'.")
 

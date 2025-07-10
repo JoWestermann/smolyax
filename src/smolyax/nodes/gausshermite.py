@@ -190,7 +190,6 @@ class GaussHermite(Generator):
         ValueError
             If the dimension cannot be inferred from inputs.
         """
-        dim = dim
         if dim is None:
             if scaling is not None:
                 dim = len(scaling)
@@ -199,15 +198,14 @@ class GaussHermite(Generator):
             else:
                 raise ValueError("Must specify at least one of 'dim', 'mean', or 'scaling'.")
 
-        if mean is None:
-            mean = np.zeros(dim)
-        if scaling is None:
-            scaling = np.ones(dim)
-
-        Generator.__init__(self, [GaussHermite1D(m, a) for m, a in zip(mean, scaling)])
-
-        self.__mean = np.asarray(mean)
-        self.__scaling = np.asarray(scaling)
+        if mean is None and scaling is None:
+            Generator.__init__(self, [GaussHermite1D()] * dim)
+            self.__mean = np.zeros(dim)
+            self.__scaling = np.ones(dim)
+        else:
+            self.__mean = np.zeros(dim) if mean is None else np.asarray(mean)
+            self.__scaling = np.ones(dim) if scaling is None else np.asarray(scaling)
+            Generator.__init__(self, [GaussHermite1D(m, a) for m, a in zip(self.__mean, self.__scaling)])
 
     def scale(self, x: Union[jax.Array, np.ndarray]) -> Union[jax.Array, np.ndarray]:
         """
