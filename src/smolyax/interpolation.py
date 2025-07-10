@@ -123,56 +123,49 @@ class SmolyakBarycentricInterpolator:
         if f_evals is None:
             f_evals = {}
 
-        # -------------------------------------------------------------------------------------------------------------
-        # Step 1 : Construct multiindices and smolyak coefficients, binned by the number of active dimensions n
-        # -------------------------------------------------------------------------------------------------------------
+        # Caching the interpolation node for nu = (0,0,...,0) for reuse in self.set_f
+        zero = np.array([g(0)[0] for g in self.__node_gen])
+
+        # get multi-indices and smolyak coefficients (only non-zero), binned by the number of active dimensions n
         n_2_nus, self.__n_2_zetas = indices.non_zero_indices_and_zetas(self.__k, self.__t)
-        # -------------------------------------------------------------------------------------------------------------
 
-        # -------------------------------------------------------------------------------------------------------------
-        # Step 2 : Compute sorted dimensions and sorted degrees for all multi-indices
-        # -------------------------------------------------------------------------------------------------------------
-        n_2_dims = {}
-        n_2_argsort_dims = {}
-
-        for n in n_2_nus.keys():
-            if n == 0:
-                continue
-            nn = len(n_2_nus[n])
-            n_2_dims[n] = np.empty((nn, n), dtype=int)
-            n_2_argsort_dims[n] = np.empty((nn, n), dtype=int)
-            self.__n_2_sorted_dims[n] = np.empty((nn, n), dtype=int)
-            self.__n_2_sorted_degs[n] = np.empty((nn, n), dtype=int)
-
-            for i, nu in enumerate(n_2_nus[n]):
-                n_2_dims[n][i] = list(k for k, _ in nu)
-                sorted_nu = sorted(nu, key=lambda x: x[1], reverse=True)
-                self.__n_2_sorted_dims[n][i], self.__n_2_sorted_degs[n][i] = zip(*sorted_nu)
-                n_2_argsort_dims[n][i] = np.argsort(self.__n_2_sorted_dims[n][i])
-
-        # -------------------------------------------------------------------------------------------------------------
-        # Step 3 : Allocate and prefill data
-        # -------------------------------------------------------------------------------------------------------------
         for n, nus in n_2_nus.items():
+
+            # ----- Store constant term (offset) of the Smolyak operator -----
+
             if n == 0:
-                # Smolyak constant term
                 assert len(self.__n_2_zetas[n]) == 1
-                self.__offset = self.__n_2_zetas[n][0]
+
+                nu = ()
+                if self.__is_nested:
+                    f_evals_nu = f_evals
+                else:
+                    f_evals_nu = f_evals.get(nu, {})
+                if nu not in f_evals_nu.keys():
+                    f_evals_nu[nu] = f(zero.copy())
+                    self.__n_f_evals_new += 1
+                if not self.__is_nested:
+                    f_evals[nu] = f_evals_nu
+
+                self.__offset = self.__n_2_zetas[n][0] * f_evals_nu[nu]
                 continue
+
+            # ----- Assemble sorted dimensions and sorted degrees -----
 
             nn = len(nus)  # number of multi-indices of length n
-            sorted_degs = self.__n_2_sorted_degs[n]
-            sorted_dims = self.__n_2_sorted_dims[n]
+            sorted_dims = np.empty((nn, n), dtype=int)
+            sorted_degs = np.empty((nn, n), dtype=int)
+
+            for i, nu in enumerate(n_2_nus[n]):
+                sorted_nu = sorted(nu, key=lambda x: x[1], reverse=True)
+                sorted_dims[i], sorted_degs[i] = zip(*sorted_nu)
+
+            # ----- Assemble nodes and weights -----
+
             tau = tuple(int(ti) for ti in sorted_degs.max(axis=0))  # per-dimension maximal degree tau_i
+            nodes = [np.zeros((nn, tau_i + 1), dtype=float) for tau_i in tau]
+            weights = [np.zeros((nn, tau_i + 1), dtype=float) for tau_i in tau]
 
-            # allocate the array storing the functions evaluations
-            self.__n_2_F[n] = np.zeros((nn, self.__d_out) + tuple(ti + 1 for ti in tau), dtype=float)
-
-            # allocate arrays for weights and nodes
-            nodes_list = [np.zeros((nn, tau_i + 1), dtype=float) for tau_i in tau]
-            weights_list = [np.zeros((nn, tau_i + 1), dtype=float) for tau_i in tau]
-
-            # populate weights and nodes
             # for each slot t, group i's by (dim,deg) so we only gen once
             for t in range(n):
                 groups: dict[tuple[int, int], list[int]] = defaultdict(list)
@@ -186,37 +179,14 @@ class SmolyakBarycentricInterpolator:
                     pts = self.__node_gen[dim](deg)
                     wts = barycentric.compute_weights(pts)
                     L = len(pts)
-                    nodes_list[t][idxs, :L] = pts
-                    weights_list[t][idxs, :L] = wts
+                    nodes[t][idxs, :L] = pts
+                    weights[t][idxs, :L] = wts
                 # we can do even better if we vectorize node_gen(degrees) for isotropic rules, like GH or Leja
 
-            self.__n_2_nodes[n] = nodes_list
-            self.__n_2_weights[n] = weights_list
+            # ----- Assemble the array storing the functions evaluations -----
 
-        # -------------------------------------------------------------------------------------------------------------
-        # Step 4 : set function evaluations
-        # -------------------------------------------------------------------------------------------------------------
+            F = np.zeros((nn, self.__d_out) + tuple(ti + 1 for ti in tau), dtype=float)
 
-        # Caching the interpolation node for nu = (0,0,...,0) for reuse in self.set_f
-        zero = np.array([g(0)[0] for g in self.__node_gen])
-
-        # Special case n = 0
-        nu = ()
-        if self.__is_nested:
-            f_evals_nu = f_evals
-        else:
-            f_evals_nu = f_evals.get(nu, {})
-        if nu not in f_evals_nu.keys():
-            f_evals_nu[nu] = f(zero.copy())
-            self.__n_f_evals_new += 1
-        self.__offset *= f_evals_nu[nu]
-
-        if not self.__is_nested:
-            f_evals[nu] = f_evals_nu
-
-        # n > 0
-        for n in self.__n_2_F.keys():
-            nodes = self.__n_2_nodes[n]
             for i, nu in enumerate(n_2_nus[n]):
                 x = zero.copy()
 
@@ -225,11 +195,11 @@ class SmolyakBarycentricInterpolator:
                 else:
                     f_evals_nu = f_evals.get(nu, {})
 
-                s_i = self.__n_2_sorted_dims[n][i]
-                argsort_s_i = n_2_argsort_dims[n][i]
-                F_i = self.__n_2_F[n][i]
+                F_i = F[i]
+                s_i = sorted_dims[i]
+                argsort_s_i = np.argsort(s_i)
 
-                ranges = [range(k + 1) for k in self.__n_2_sorted_degs[n][i]]
+                ranges = [range(k + 1) for k in sorted_degs[i]]
                 for mu_degrees in it.product(*ranges):
                     mu_tuple = tuple((s_i[i], mu_degrees[i]) for i in argsort_s_i if mu_degrees[i] > 0)
                     if mu_tuple not in f_evals_nu:
@@ -241,11 +211,12 @@ class SmolyakBarycentricInterpolator:
                 if not self.__is_nested:
                     f_evals[nu] = f_evals_nu
 
-            # cast to jnp data structures
-            self.__n_2_F[n] = jnp.array(self.__n_2_F[n])
-            self.__n_2_nodes[n] = [jnp.array(xi) for xi in self.__n_2_nodes[n]]
-            self.__n_2_weights[n] = [jnp.array(w) for w in self.__n_2_weights[n]]
-            self.__n_2_sorted_dims[n] = jnp.array(self.__n_2_sorted_dims[n])
+            # save as jnp data structures
+            self.__n_2_F[n] = jnp.array(F)
+            self.__n_2_sorted_degs[n] = jnp.array(sorted_degs)
+            self.__n_2_sorted_dims[n] = jnp.array(sorted_dims)
+            self.__n_2_nodes[n] = [jnp.array(xi) for xi in nodes]
+            self.__n_2_weights[n] = [jnp.array(w) for w in weights]
             self.__n_2_zetas[n] = jnp.array(self.__n_2_zetas[n])
 
         self.__compile_for_batchsize(batchsize)
