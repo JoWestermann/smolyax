@@ -17,7 +17,7 @@ def test_interpolation():
 
         f = setup.TestPolynomial(node_gen=node_gen, k=k, t=t, d_out=d_out)
 
-        ip = SmolyakBarycentricInterpolator(node_gen=node_gen, k=k, t=t, d_out=d_out, batchsize=1, f=f)
+        ip = SmolyakBarycentricInterpolator(node_gen=node_gen, k=k, t=t, d_out=d_out, f=f)
 
         for n in range(5):
             x = node_gen.get_random(n=np.random.randint(low=1, high=5))
@@ -39,7 +39,7 @@ def test_quadrature():
 
         f = setup.TestPolynomial(node_gen=node_gen, k=k, t=t, d_out=d_out)
 
-        ip = SmolyakBarycentricInterpolator(node_gen=node_gen, k=k, t=t, d_out=d_out, batchsize=1, f=f)
+        ip = SmolyakBarycentricInterpolator(node_gen=node_gen, k=k, t=t, d_out=d_out, f=f)
 
         Q_ip = ip.integral()
         assert Q_ip.shape == (d_out,)
@@ -62,7 +62,7 @@ def test_gradient():
 
         f = setup.TestPolynomial(node_gen=node_gen, k=k, t=t, d_out=d_out)
 
-        ip = SmolyakBarycentricInterpolator(node_gen=node_gen, k=k, t=t, d_out=d_out, batchsize=1, f=f)
+        ip = SmolyakBarycentricInterpolator(node_gen=node_gen, k=k, t=t, d_out=d_out, f=f)
 
         for n in range(5):
             x = node_gen.get_random(n=np.random.randint(low=1, high=5))
