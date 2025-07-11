@@ -383,7 +383,7 @@ class SmolyakBarycentricInterpolator:
         jax.Array
             Integral of the interpolant. Shape: `(d_out,)`.
         """
-        # assemble quadrature weights, closely following the logic in __init_nodes_and_weights
+        # assemble quadrature weights, closely following the logic in set_f to assemble nodes and weights
         # ----------------------------------------------------------------------------
         n_2_quad_weights = {}
 
