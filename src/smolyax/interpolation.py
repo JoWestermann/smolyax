@@ -44,7 +44,8 @@ class SmolyakBarycentricInterpolator:
         k: Sequence[float],
         t: float,
         f: Callable[[Union[jax.Array, np.ndarray]], Union[jax.Array, np.ndarray]] = None,
-        batchsize: int = None,
+        n_inputs: int = None,
+        memory_limit: float = 4.0,
     ) -> None:
         """
         Initialize the Smolyak Barycentric Interpolator.
@@ -63,9 +64,12 @@ class SmolyakBarycentricInterpolator:
             Target function to interpolate. While `f` can be passed at construction time, for a better control over, and
             potential reuse of, function evaluations consider calling [`set_f()`](#SmolyakBarycentricInterpolator.set_f)
             *after* construction.
-        batchsize : int, default=None
-            Expected batch size of the interpolator input, used to pre-compile the `__call__` method via a warm-up call.
-            If `batchsize` is `None`, the warm-up is skipped.
+        n_inputs : int, default=None
+            Expected number of input samples, used to pre-compile the `__call__` method via a warm-up call.
+            If `n_input` is `None`, the warm-up is skipped and `n_input` is set upon first use of `__call__`.
+        memory_limit : float, optional
+            Maximum memory in gigabytes to use during batched evaluation. Controls the batch size
+            to stay within this memory limit. Default is 4.0.
         """
         self.__d_in = len(k)
         self.__d_out = d_out
@@ -84,21 +88,23 @@ class SmolyakBarycentricInterpolator:
         self.__n_2_sorted_degs = {}
         self.__n_2_zetas = {}
 
-        self.__compiled_tensor_product_evaluation = {}
-        self.__compiled_tensor_product_gradient = {}
-
         self.__n_f_evals = indices.nodeset_cardinality(k, t, nested=self.__is_nested)
         self.__n_f_evals_new = 0
 
+        self.__compiled_tensor_product_evaluation = {}
+        self.__compiled_tensor_product_gradient = {}
+
+        self.__memory_limit = memory_limit
+        self.__n_inputs = n_inputs
+
         if f is not None:
-            self.set_f(f=f, batchsize=batchsize)
+            self.set_f(f=f)
 
     def set_f(
         self,
         *,
         f: Callable[[Union[jax.Array, np.ndarray]], Union[jax.Array, np.ndarray]],
         f_evals: dict[tuple, dict[tuple, jax.Array]] = None,
-        batchsize: int = None,
     ) -> dict[tuple, dict[tuple, jax.Array]]:
         """
         Compute (or reuse pre-computed) evaluations of the target function `f` at the interpolation nodes of the
@@ -111,9 +117,6 @@ class SmolyakBarycentricInterpolator:
         f_evals : dict, optional
             A dictionary mapping interpolation nodes to function evaluations.
             If provided, these evaluations will be reused.
-        batchsize : int, default=None
-            Expected batch size of the interpolator input, used to pre-compile the `__call__` method via a warm-up call.
-            If `batchsize` is `None`, the warm-up is skipped.
 
         Returns
         -------
@@ -219,11 +222,11 @@ class SmolyakBarycentricInterpolator:
             self.__n_2_weights[n] = [jnp.array(w) for w in weights]
             self.__n_2_zetas[n] = jnp.array(self.__n_2_zetas[n])
 
-        self.__compile_for_batchsize(batchsize)
+        self.__setup_eval_functions()
 
         return f_evals
 
-    def __compile_for_batchsize(self, batchsize: int) -> None:
+    def __setup_eval_functions(self) -> None:
 
         def __create_evaluate_tensor_product_interpolant(n: int):
             def __evaluate_tensor_product_interpolant_wrapped(x, F, *args):
@@ -253,12 +256,12 @@ class SmolyakBarycentricInterpolator:
             self.__compiled_tensor_product_evaluation[n] = __create_evaluate_tensor_product_interpolant(n)
             self.__compiled_tensor_product_gradient[n] = __create_evaluate_tensor_product_gradient(n)
 
-        if batchsize is not None:
-            inputs = jax.random.uniform(jax.random.PRNGKey(0), (batchsize, self.__d_in))
+        if self.__n_inputs is not None:
+            inputs = jax.random.uniform(jax.random.PRNGKey(0), (self.__n_inputs, self.__d_in))
             _ = self(inputs)
             _ = self.gradient(inputs)
 
-    def __call__(self, x: Union[jax.Array, np.ndarray], memory_max_GB: float = 4.0) -> jax.Array:
+    def __call__(self, x: Union[jax.Array, np.ndarray]) -> jax.Array:
         """@public
         Evaluate the Smolyak operator at points `x`.
 
@@ -268,9 +271,6 @@ class SmolyakBarycentricInterpolator:
             Points at which to evaluate the Smolyak interpolant of the target function `f`.
             Shape: `(n_points, d_in)` or `(d_in,)`, where `n_points` is the number of evaluation points
             and `d_in` is the dimension of the input domain.
-        memory_max_GB : float, optional
-            Maximum memory in gigabytes to use during batched evaluation. Controls the batch size
-            to stay within this memory limit. Default is 4.0.
 
         Returns
         -------
@@ -292,7 +292,7 @@ class SmolyakBarycentricInterpolator:
             # determine the number of batches that ensures that the computation stays within the given memory limit
             n_terms = self.__n_2_F[n].shape[0]
             memory_per_term_GB = I_Lambda_x.size * np.prod(self.__n_2_F[n].shape[3:]) * 8 / (1024**3)
-            batch_size = max(1, int(np.floor(memory_max_GB / memory_per_term_GB)))
+            batch_size = max(1, int(np.floor(self.__memory_limit / memory_per_term_GB)))
             n_batches = int(np.ceil(n_terms / batch_size))
 
             # batched processing of tensor product interpolants with n active dimensions
@@ -312,7 +312,7 @@ class SmolyakBarycentricInterpolator:
 
         return I_Lambda_x
 
-    def gradient(self, x: Union[jax.Array, np.ndarray], memory_max_GB: float = 4.0) -> jax.Array:
+    def gradient(self, x: Union[jax.Array, np.ndarray]) -> jax.Array:
         """
         Compute the gradient of the Smolyak interpolant at the given points.
 
@@ -320,9 +320,6 @@ class SmolyakBarycentricInterpolator:
         ----------
         x : Union[jax.Array, numpy.ndarray]
             Points at which to evaluate the gradient. Shape: `(n_points, d_in)`.
-        memory_max_GB : float, optional
-            Maximum memory in gigabytes to use during batched evaluation. Controls the batch size
-            to stay within this memory limit. Default is 4.0.
 
         Returns
         -------
@@ -345,7 +342,7 @@ class SmolyakBarycentricInterpolator:
             # determine the number of batches that ensures that the computation stays within the given memory limit
             n_terms = self.__n_2_F[n].shape[0]
             memory_per_term_GB = J_Lambda_x.size * np.prod(self.__n_2_F[n].shape[3:]) * 8 / (1024**3)
-            batch_size = max(1, int(np.floor(memory_max_GB / memory_per_term_GB)))
+            batch_size = max(1, int(np.floor(self.__memory_limit / memory_per_term_GB)))
             n_batches = int(np.ceil(n_terms / batch_size))
 
             # batched processing of tensor product gradients with n active dimensions
