@@ -261,6 +261,17 @@ class SmolyakBarycentricInterpolator:
             _ = self(inputs)
             _ = self.gradient(inputs)
 
+    def __validate_input(self, x: Union[jax.Array, np.ndarray]) -> Union[jax.Array, np.ndarray]:
+        assert bool(self.__compiled_tensor_product_evaluation) == bool(
+            self.__n_2_F
+        ), "The operator has not yet been set up for a target function via `set_f`."
+        x = jnp.asarray(x)
+        if x.shape == (self.__d_in,):
+            x = x[None, :]
+        assert x.shape[1] == self.__d_in, f"{x.shape[1]} != {self.__d_in}"
+        self.__n_inputs = x.shape[0]
+        return x
+
     def __call__(self, x: Union[jax.Array, np.ndarray]) -> jax.Array:
         """@public
         Evaluate the Smolyak operator at points `x`.
@@ -277,15 +288,8 @@ class SmolyakBarycentricInterpolator:
         jax.Array
             The interpolant of the target function `f` evaluated at points `x`. Shape: `(n_points, d_out)`
         """
-        assert bool(self.__compiled_tensor_product_evaluation) == bool(
-            self.__n_2_F
-        ), "The operator has not yet been compiled for a target function."
-        x = jnp.asarray(x)
-        if x.shape == (self.__d_in,):
-            x = x[None, :]
-        assert x.shape[1] == self.__d_in, f"{x.shape[1]} != {self.__d_in}"
-
-        I_Lambda_x = jnp.broadcast_to(self.__offset, (x.shape[0], self.__d_out))
+        x = self.__validate_input(x)
+        I_Lambda_x = jnp.broadcast_to(self.__offset, (self.__n_inputs, self.__d_out))
 
         for n in self.__compiled_tensor_product_evaluation.keys():
 
@@ -327,14 +331,7 @@ class SmolyakBarycentricInterpolator:
             Gradient of the interpolant evaluated at `x`.
             Shape: `(n_points, d_out, d_in)`.
         """
-        assert bool(self.__compiled_tensor_product_evaluation) == bool(
-            self.__n_2_F
-        ), "The operator has not yet been compiled for a target function."
-        x = jnp.asarray(x)
-        if x.shape == (self.__d_in,):
-            x = x[None, :]
-        assert x.shape[1] == self.__d_in, f"{x.shape[1]} != {self.__d_in}"
-
+        x = self.__validate_input(x)
         J_Lambda_x = jnp.zeros((x.shape[0], self.__d_out, self.__d_in))
 
         for n in self.__compiled_tensor_product_gradient.keys():
