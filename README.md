@@ -106,10 +106,6 @@ Then compare your feature branch against the baseline:
 ```
 pytest --benchmark-only --benchmark-compare=0001_baseline --benchmark-sort=name --benchmark-compare-fail=min:5%
 ```
-Make sure to update the documentation:
-```
-pdoc src/smolyax --math --docformat numpy -o docs
-```
 Submit your feature via a pull request.
 
 ## Cite
