@@ -279,12 +279,13 @@ class SmolyakBarycentricInterpolator:
 
             # batched processing of tensor product interpolants with n active dimensions
             for start_s in range(0, n_summands, summands_batch_size):
+
                 end_s = min(start_s + summands_batch_size, n_summands)
                 res = self.__compiled_tensor_product_evaluation[n](
                     x,
                     self.__n_2_F[n][start_s:end_s],
-                    self.__n_2_nodes[n],
-                    self.__n_2_weights[n],
+                    self.__n_2_nodes[n][start_s:end_s],
+                    self.__n_2_weights[n][start_s:end_s],
                     self.__n_2_sorted_dims[n][start_s:end_s],
                     self.__n_2_sorted_degs[n][start_s:end_s],
                     self.__n_2_zetas[n][start_s:end_s],
