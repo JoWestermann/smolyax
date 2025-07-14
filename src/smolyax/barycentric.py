@@ -68,8 +68,8 @@ def evaluate_basis_unnormalized(x: jax.Array, xi: jax.Array, w: jax.Array, nu_i:
 def evaluate_tensor_product_interpolant(
     x: jax.Array,
     F: jax.Array,
-    xi_list: Sequence[jax.Array],
-    w_list: Sequence[jax.Array],
+    xi_list: jax.Array,
+    w_list: jax.Array,
     sorted_dims: Sequence[int],
     sorted_degs: Sequence[int],
     zeta: int,
@@ -89,11 +89,11 @@ def evaluate_tensor_product_interpolant(
         Should be a multi-dimensional array with shape `(d_out, mu_1, mu_2, ..., mu_n)`
         where each `mu_i` corresponds to the number of points in the ith dimension.
 
-    xi_list : Sequence[jax.Array]
-        Interpolation nodes. A sequence of 1D arrays, each with shape `(mu_i,)` for the ith dimension.
+    xi_list : jax.Array
+        Interpolation nodes. A sequence of `n` stacked 1D arrays of length `max(mu_1, mu_2, ..., mu_n)`
 
-    w_list : Sequence[jax.Array]
-        Interpolation weights. A sequence of 1D arrays, each with shape `(mu_i,)` for the ith dimension.
+    w_list : jax.Array
+        Interpolation weights. A sequence of `n` stacked 1D arrays of length `max(mu_1, mu_2, ..., mu_n)`
 
     sorted_dims : Sequence[int]
         Dimensions with nonzero interpolation degree.
@@ -110,13 +110,15 @@ def evaluate_tensor_product_interpolant(
         The evaluated tensor product interpolant at the points specified by `x`.
         The shape of the output will be `(n_points, d_out)`.
     """
-    norm = jnp.ones(x.shape[0])
-    for i, (si, nui) in enumerate(zip(sorted_dims, sorted_degs)):
-        b = evaluate_basis_unnormalized(x[:, [si]], xi_list[i], w_list[i], nui)
-        if i == 0:
-            F = jnp.einsum("ij,kj...->ik...", b, F)
-        else:
-            F = jnp.einsum("ij,ikj...->ik...", b, F)
+    idx = F.shape[1]
+    b = evaluate_basis_unnormalized(x[:, [sorted_dims[0]]], xi_list[0][:idx], w_list[0][:idx], sorted_degs[0])
+    F = jnp.einsum("ij,kj...->ik...", b, F)
+    norm = jnp.sum(b, axis=1)
+
+    for i, (si, nui, ni, wi) in enumerate(zip(sorted_dims[1:], sorted_degs[1:], xi_list[1:], w_list[1:])):
+        idx = F.shape[2]
+        b = evaluate_basis_unnormalized(x[:, [si]], ni[:idx], wi[:idx], nui)
+        F = jnp.einsum("ij,ikj...->ik...", b, F)
         norm *= jnp.sum(b, axis=1)
     return zeta * F / norm[:, None]
 
