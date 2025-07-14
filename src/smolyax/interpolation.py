@@ -270,7 +270,7 @@ class SmolyakBarycentricInterpolator:
         x = self.__validate_input(x)
         I_Lambda_x = jnp.broadcast_to(self.__offset, (self.__n_inputs, self.__d_out))
 
-        for n in self.__compiled_tensor_product_evaluation.keys():
+        for n in self.__n_2_F.keys():
 
             n_summands = self.__n_2_F[n].shape[0]
             memory_per_summand = self.__n_inputs * self.__d_out * np.prod(self.__n_2_F[n].shape[3:]) * 8 / (1024**3)
@@ -311,7 +311,7 @@ class SmolyakBarycentricInterpolator:
         x = self.__validate_input(x)
         J_Lambda_x = jnp.zeros((x.shape[0], self.__d_out, self.__d_in))
 
-        for n in self.__compiled_tensor_product_gradient.keys():
+        for n in self.__n_2_F.keys():
 
             # determine the number of batches that ensures that the computation stays within the given memory limit
             n_terms = self.__n_2_F[n].shape[0]
