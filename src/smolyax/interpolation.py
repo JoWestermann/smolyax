@@ -91,8 +91,8 @@ class SmolyakBarycentricInterpolator:
         self.__n_f_evals = indices.nodeset_cardinality(k, t, nested=self.__is_nested)
         self.__n_f_evals_new = 0
 
-        self.__compiled_tensor_product_evaluation = {}
-        self.__compiled_tensor_product_gradient = {}
+        self.__compiled_tensor_product_evaluation = None
+        self.__compiled_tensor_product_gradient = None
 
         self.__memory_limit = memory_limit
         self.__n_inputs = n_inputs
@@ -228,13 +228,12 @@ class SmolyakBarycentricInterpolator:
 
     def __setup_eval_functions(self) -> None:
 
-        for n in self.__n_2_F.keys():
-            self.__compiled_tensor_product_evaluation[n] = jax.vmap(
-                jax.jit(barycentric.evaluate_tensor_product_interpolant), in_axes=(None, 0, 0, 0, 0, 0, 0)
-            )
-            self.__compiled_tensor_product_gradient[n] = jax.vmap(
-                jax.jit(barycentric.evaluate_tensor_product_gradient), in_axes=(None, 0, 0, 0, 0, 0, 0)
-            )
+        self.__compiled_tensor_product_evaluation = jax.jit(
+            jax.vmap(barycentric.evaluate_tensor_product_interpolant, in_axes=(None, 0, 0, 0, 0, 0, 0))
+        )
+        self.__compiled_tensor_product_gradient = jax.jit(
+            jax.vmap(barycentric.evaluate_tensor_product_gradient, in_axes=(None, 0, 0, 0, 0, 0, 0))
+        )
 
         if self.__n_inputs is not None:
             inputs = jax.random.uniform(jax.random.PRNGKey(0), (self.__n_inputs, self.__d_in))
@@ -281,7 +280,7 @@ class SmolyakBarycentricInterpolator:
             for start_s in range(0, n_summands, summands_batch_size):
 
                 end_s = min(start_s + summands_batch_size, n_summands)
-                res = self.__compiled_tensor_product_evaluation[n](
+                res = self.__compiled_tensor_product_evaluation(
                     x,
                     self.__n_2_F[n][start_s:end_s],
                     self.__n_2_nodes[n][start_s:end_s],
