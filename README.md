@@ -31,21 +31,25 @@ in well less under $0.1$ seconds on a contemporary laptop CPU.
 
 ### Dependencies
 
-```
-jax
-numba
-```
+`smolyax` requires `python >= 3.11`. Core dependencies are `jax` and `numba`, for more details see [pyproject.toml](https://github.com/JoWestermann/smolyax/blob/main/pyproject.toml).
 
 ### Installation
 
 To install `smolyax` and its dependencies, run:
 ```
-pip install git+https://github.com/JoWestermann/smolyax.git
+pip install "smolyax @ git+https://github.com/JoWestermann/smolyax.git"
 ```
 
-For enabling GPU computation run additionally:
+To install `smolyax` with GPU support enabled, run:
 ```
-pip install "jax[cuda]"
+pip install "smolyax[cuda] @ git+https://github.com/JoWestermann/smolyax.git"
+```
+
+In order to run notebooks and/or tests, install via
+```
+git clone git@github.com:JoWestermann/smolyax.git
+pip install -e "smolyax[notebook]" # for additionally installing notebook and plotting dependencies
+pip install -e "smolyax[dev]" # for additionally installing testing, code quality and documentation dependencies
 ```
 
 ### Usage
@@ -89,24 +93,18 @@ and that we will work on prioritized on demand via our
 [open issues](https://github.com/JoWestermann/smolyax/issues?q=is%3Aissue%20state%3Aopen%20label%3Aenhancement).
 
 ### Submit a feature!
-To develop new features or make changes, install `smolyax` with its developer dependencies.
-```
-git clone git@github.com:JoWestermann/smolyax.git
-pip install -e "smolyax[dev]"
-```
-While working on your change, make sure all tests pass:
+If you want to submit a feature, please do so via a pull request. Ensure that all tests run through by running
 ```
 pytest
 ```
-Verify that performance hasn’t regressed. First create a baseline on the main branch:
+from the project root directory, and ensure that performance has not degraded by first creating a benchmark on the main branch via
 ```
 pytest --benchmark-only --benchmark-save=baseline
 ```
-Then compare your feature branch against the baseline:
+and compare performance on your feature branch against this baseline via
 ```
 pytest --benchmark-only --benchmark-compare=0001_baseline --benchmark-sort=name --benchmark-compare-fail=min:5%
 ```
-Submit your feature via a pull request.
 
 ## Cite
 
