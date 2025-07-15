@@ -25,7 +25,7 @@ in well less under $0.1$ seconds on a contemporary laptop CPU.
 ### Documentation
 
 - For an introduction to relevant literature and the key implementation concepts, see the [JOSS paper (under review)](https://github.com/JoWestermann/smolyax/blob/main/paper/paper.md) accompanying this repository.
-- For code documentation see [here](https://github.com/JoWestermann/smolyax/tree/main/docs).
+- For code documentation see [here](https://jowestermann.github.io/smolyax/smolyax.html).
 
 ## Get started
 
@@ -104,10 +104,6 @@ pytest --benchmark-only --benchmark-save=baseline
 and compare performance on your feature branch against this baseline via
 ```
 pytest --benchmark-only --benchmark-compare=0001_baseline --benchmark-sort=name --benchmark-compare-fail=min:5%
-```
-Make sure to update the documentation:
-```
-pdoc src/smolyax --math --docformat numpy -o docs
 ```
 
 ## Cite
