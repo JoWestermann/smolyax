@@ -12,10 +12,10 @@ authors = [
 ]
 license = { text = "MIT" }
 dependencies = [
-    "jax >= 0.6.2",
-    "numba >= 0.61.2",
+    "jax >= 0.4.30",
+    "numba >= 0.60.0"
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.9"
 
 [project.optional-dependencies]
 dev = [
@@ -28,7 +28,7 @@ dev = [
     "pdoc >= 15.0.4",
     "mypy >= 1.16.1",
     "ipykernel >= 6.29.5",
-    "matplotlib >= 3.10.3"
+    "matplotlib >= 3.9.4"
 ]
 
 [tool.black]
