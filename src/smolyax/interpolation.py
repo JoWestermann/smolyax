@@ -12,8 +12,19 @@ jax.config.update("jax_enable_x64", True)
 
 
 class SmolyakBarycentricInterpolator:
-    """
-    A class implementing the Smolyak operator to interpolate high-dimensional and vector-valued functions.
+    r"""
+    A class implementing the Smolyak operator to interpolate high-dimensional and vector-valued functions
+    $f : \mathbb R^{d_{\rm in}} \to \mathbb R^{d_{\rm out}}$ via
+    $$
+    I^{\Lambda_{\boldsymbol{k},t}} [f] =
+    \sum \limits_{\boldsymbol{\nu} \in \Lambda_{\boldsymbol{k},t}}
+    \zeta_{\Lambda_{\boldsymbol{k},t}, \boldsymbol{\nu}} I^\boldsymbol{\nu}[f]
+    $$
+    where
+    $\Lambda_{\boldsymbol{k},t} \subset \mathbb N^{d_{\rm in}}$ is a potentially anisotropic
+    [multi-index set](indices#indexset)
+    $\zeta_{\Lambda, \boldsymbol{\nu}}$ are the Smolyak coefficients and
+    $I^\boldsymbol{\nu}$ is the tensor product interpolation operator with orders $\boldsymbol{\nu}$.
     """
 
     @property
@@ -47,7 +58,7 @@ class SmolyakBarycentricInterpolator:
         n_inputs: int = None,
         memory_limit: float = 4.0,
     ) -> None:
-        """
+        r"""
         Initialize the Smolyak Barycentric Interpolator.
 
         Parameters
@@ -55,9 +66,9 @@ class SmolyakBarycentricInterpolator:
         node_gen : nodes.Generator
             Generator object that returns interpolation nodes for each dimension.
         k : Union[jax.Array, np.ndarray]
-            Anisotropy weight vector of the multi-index set. Shape `(d_in,)`.
+            Anisotropy weight vector $\boldsymbol{k}$ of the multi-index set. Shape `(d_in,)`.
         t : float
-            Threshold that controls the size of the multi-index set.
+            Threshold $t$ that controls the size of the multi-index set.
         d_out : int
             Output dimension of the target function.
         f : Callable[[Union[jax.Array, np.ndarray]], Union[jax.Array, np.ndarray]], optional
