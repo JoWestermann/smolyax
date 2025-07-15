@@ -200,7 +200,7 @@ class SmolyakBarycentricInterpolator:
 
             # ----- Assemble the array storing the functions evaluations -----
 
-            F = np.zeros((nn, self.__d_out) + tuple(ti + 1 for ti in tau), dtype=float)
+            F = np.zeros((nn,) + tuple(ti + 1 for ti in tau) + (self.__d_out,), dtype=float)
 
             for i, nu in enumerate(n_2_nus[n]):
                 x = zero.copy()
@@ -215,19 +215,19 @@ class SmolyakBarycentricInterpolator:
                 argsort_s_i = np.argsort(s_i)
 
                 ranges = [range(k + 1) for k in sorted_degs[i]]
+
                 for mu_degrees in it.product(*ranges):
                     mu_tuple = tuple((s_i[i], mu_degrees[i]) for i in argsort_s_i if mu_degrees[i] > 0)
                     if mu_tuple not in f_evals_nu:
                         x[s_i] = [xi_k[deg] for xi_k, deg in zip(nodes[i], mu_degrees)]
                         f_evals_nu[mu_tuple] = f(x)
                         self.__n_f_evals_new += 1
-                    F_i[:, *mu_degrees] = f_evals_nu[mu_tuple]
+                    F_i[mu_degrees] = f_evals_nu[mu_tuple]
 
                 if not self.__is_nested:
                     f_evals[nu] = f_evals_nu
-
             # save as jnp data structures
-            self.__n_2_F[n] = jnp.array(F)
+            self.__n_2_F[n] = jnp.array(np.moveaxis(F, -1, 1))
             self.__n_2_sorted_degs[n] = jnp.array(sorted_degs)
             self.__n_2_sorted_dims[n] = jnp.array(sorted_dims)
             self.__n_2_nodes[n] = jnp.array(nodes)
