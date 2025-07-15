@@ -19,6 +19,8 @@ jobs:
         with:
           python-version: '3.11'
           cache: pip
+      - name: Install project
+        run: pip install .[dev]
       - run: pip install pdoc
       - name: Generate docs
         run: pdoc src/smolyax --math --docformat numpy -o site
@@ -37,3 +39,4 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
