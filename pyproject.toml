@@ -28,7 +28,7 @@ notebook = [
 dev = [
     "pytest >= 8.4.1",
     "pytest-benchmark >= 5.1.0",
-    "pytype >= 2024.10.11",
+    "pytype",
     "black >= 25.1.0",
     "flake8 >= 7.3.0",
     "flake8-pyproject >= 1.2.3",
