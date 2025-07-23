@@ -37,15 +37,26 @@ class SmolyakBarycentricInterpolator:
         """Output dimension of target function and interpolant"""
         return self.__d_out
 
+    @property
+    def n_f_evals(self) -> int:
+        """Number of function evaluations (== number of interpolation nodes) used by the interpolator"""
+        return self.__n_f_evals
+
+    @property
+    def n_f_evals_new(self) -> int:
+        """Number of function evaluations that were not reused from previous computations"""
+        return self.__n_f_evals_new
+
     def __init__(
         self,
         *,
+        d_out: int,
         node_gen: nodes.Generator,
         k: Sequence[float],
         t: float,
-        d_out: int,
         f: Callable[[Union[jax.Array, np.ndarray]], Union[jax.Array, np.ndarray]] = None,
-        batchsize: int = None,
+        n_inputs: int = None,
+        memory_limit: float = 4.0,
     ) -> None:
         r"""
         Initialize the Smolyak Barycentric Interpolator.
@@ -64,116 +75,47 @@ class SmolyakBarycentricInterpolator:
             Target function to interpolate. While `f` can be passed at construction time, for a better control over, and
             potential reuse of, function evaluations consider calling [`set_f()`](#SmolyakBarycentricInterpolator.set_f)
             *after* construction.
-        batchsize : int, default=None
-            Expected batch size of the interpolator input, used to pre-compile the `__call__` method via a warm-up call.
-            If `batchsize` is `None`, the warm-up is skipped.
+        n_inputs : int, default=None
+            Expected number of input samples, used to pre-compile the `__call__` method via a warm-up call.
+            If `n_input` is `None`, the warm-up is skipped and `n_input` is set upon first use of `__call__`.
+        memory_limit : float, optional
+            Maximum memory in gigabytes to use during batched evaluation. Controls the batch size
+            to stay within this memory limit. Default is 4.0.
         """
         self.__d_in = len(k)
         self.__d_out = d_out
-        self.__is_nested = node_gen.is_nested
+
         self.__node_gen = node_gen
+        self.__is_nested = node_gen.is_nested
 
-        # Step 1 : Bin multiindices and smolyak coefficients by the number of active dimensions, n
-        self.__init_indices_data(k, t)
+        self.__k = k
+        self.__t = t
 
-        # Step 2 : Compute sorted dimensions and sorted degrees for all multi-indices
-        self.__init_indices_sorting()
+        self.__offset = 0
+        self.__n_2_F = {}
+        self.__n_2_nodes = {}
+        self.__n_2_weights = {}
+        self.__n_2_sorted_dims = {}
+        self.__n_2_sorted_degs = {}
+        self.__n_2_zetas = {}
 
-        # Step 3 : Allocate and prefill data
-        self.__init_nodes_and_weights()
+        self.__n_f_evals = indices.nodeset_cardinality(k, t, nested=self.__is_nested)
+        self.__n_f_evals_new = 0
 
-        # Caching the interpolation node for nu = (0,0,...,0) for reuse in self.set_f
-        self.__zero = np.array([g(0)[0] for g in self.__node_gen])
+        self.__compiled_tensor_product_evaluation = None
+        self.__compiled_tensor_product_gradient = None
 
-        self.__compiled_tensor_product_evaluation = {}
-        self.__compiled_tensor_product_gradient = {}
+        self.__memory_limit = memory_limit
+        self.__n_inputs = n_inputs
 
         if f is not None:
-            self.set_f(f=f, batchsize=batchsize)
-
-    def __init_indices_data(self, k: Sequence[float], t: float):
-        self.n_2_nus, self.n_2_zetas = indices.non_zero_indices_and_zetas(k, t)
-
-        # Tracking number of evaluations of the interpolation target f.
-        #   - self.n_f_evals tracks the total number of function evaluations used by the interpolator
-        #   - self.n_f_evals_new counts only new function calls.
-        # If evaluations are reused across interpolator instances, then likely self.n_f_evals_new < self.n_f_evals
-        self.n_f_evals = indices.nodeset_cardinality(k, t, nested=self.__is_nested)
-        self.n_f_evals_new = 0
-
-    def __init_indices_sorting(self):
-        self.n_2_dims = {}
-        self.n_2_sorted_dims = {}
-        self.n_2_sorted_degs = {}
-        self.n_2_argsort_dims = {}
-
-        for n in self.n_2_nus.keys():
-            if n == 0:
-                continue
-            nn = len(self.n_2_nus[n])
-            self.n_2_dims[n] = np.empty((nn, n), dtype=int)
-            self.n_2_sorted_dims[n] = np.empty((nn, n), dtype=int)
-            self.n_2_sorted_degs[n] = np.empty((nn, n), dtype=int)
-            self.n_2_argsort_dims[n] = np.empty((nn, n), dtype=int)
-
-            for i, nu in enumerate(self.n_2_nus[n]):
-                self.n_2_dims[n][i] = list(k for k, _ in nu)
-                sorted_nu = sorted(nu, key=lambda x: x[1], reverse=True)
-                self.n_2_sorted_dims[n][i], self.n_2_sorted_degs[n][i] = zip(*sorted_nu)
-                self.n_2_argsort_dims[n][i] = np.argsort(self.n_2_sorted_dims[n][i])
-
-    def __init_nodes_and_weights(self):
-        self.offset = 0
-        self.n_2_F = {}
-        self.n_2_nodes = {}
-        self.n_2_weights = {}
-
-        for n, nus in self.n_2_nus.items():
-            if n == 0:
-                # Smolyak constant term
-                assert len(self.n_2_zetas[n]) == 1
-                self.offset = self.n_2_zetas[n][0]
-                continue
-
-            nn = len(nus)  # number of multi-indices of length n
-            sorted_degs = self.n_2_sorted_degs[n]
-            sorted_dims = self.n_2_sorted_dims[n]
-            tau = tuple(int(ti) for ti in sorted_degs.max(axis=0))  # per-dimension maximal degree tau_i
-
-            # allocate the array storing the functions evaluations
-            self.n_2_F[n] = np.zeros((nn, self.__d_out) + tuple(ti + 1 for ti in tau), dtype=float)
-
-            # allocate arrays for weights and nodes
-            nodes_list = [np.zeros((nn, tau_i + 1), dtype=float) for tau_i in tau]
-            weights_list = [np.zeros((nn, tau_i + 1), dtype=float) for tau_i in tau]
-
-            # populate weights and nodes
-            # for each slot t, group i's by (dim,deg) so we only gen once
-            for t in range(n):
-                groups: dict[tuple[int, int], list[int]] = defaultdict(list)
-                for i in range(nn):
-                    dim = int(sorted_dims[i, t])
-                    deg = int(sorted_degs[i, t])
-                    groups[(dim, deg)].append(i)
-
-                # now for each unique (dim,deg) compute pts & wts once
-                for (dim, deg), idxs in groups.items():
-                    pts = self.__node_gen[dim](deg)
-                    wts = barycentric.compute_weights(pts)
-                    L = len(pts)
-                    nodes_list[t][idxs, :L] = pts
-                    weights_list[t][idxs, :L] = wts
-                # we can do even better if we vectorize node_gen(degrees) for isotropic rules, like GH or Leja
-
-            self.n_2_nodes[n] = nodes_list
-            self.n_2_weights[n] = weights_list
+            self.set_f(f=f)
 
     def set_f(
         self,
         *,
         f: Callable[[Union[jax.Array, np.ndarray]], Union[jax.Array, np.ndarray]],
         f_evals: dict[tuple, dict[tuple, jax.Array]] = None,
-        batchsize: int = None,
     ) -> dict[tuple, dict[tuple, jax.Array]]:
         """
         Compute (or reuse pre-computed) evaluations of the target function `f` at the interpolation nodes of the
@@ -186,9 +128,6 @@ class SmolyakBarycentricInterpolator:
         f_evals : dict, optional
             A dictionary mapping interpolation nodes to function evaluations.
             If provided, these evaluations will be reused.
-        batchsize : int, default=None
-            Expected batch size of the interpolator input, used to pre-compile the `__call__` method via a warm-up call.
-            If `batchsize` is `None`, the warm-up is skipped.
 
         Returns
         -------
@@ -198,94 +137,130 @@ class SmolyakBarycentricInterpolator:
         if f_evals is None:
             f_evals = {}
 
-        # Special case n = 0
-        nu = ()
-        if self.__is_nested:
-            f_evals_nu = f_evals
-        else:
-            f_evals_nu = f_evals.get(nu, {})
-        if nu not in f_evals_nu.keys():
-            f_evals_nu[nu] = f(self.__zero.copy())
-            self.n_f_evals_new += 1
-        self.offset *= f_evals_nu[nu]
+        # Caching the interpolation node for nu = (0,0,...,0) for reuse in self.set_f
+        zero = np.array([g(0)[0] for g in self.__node_gen])
 
-        if not self.__is_nested:
-            f_evals[nu] = f_evals_nu
+        # get multi-indices and smolyak coefficients (only non-zero), binned by the number of active dimensions n
+        n_2_nus, self.__n_2_zetas = indices.non_zero_indices_and_zetas(self.__k, self.__t)
 
-        # n > 0
-        for n in self.n_2_F.keys():
-            nodes = self.n_2_nodes[n]
-            for i, nu in enumerate(self.n_2_nus[n]):
-                x = self.__zero.copy()
+        for n, nus in n_2_nus.items():
+
+            # ----- Store constant term (offset) of the Smolyak operator -----
+
+            if n == 0:
+                assert len(self.__n_2_zetas[n]) == 1
+
+                nu = ()
+                if self.__is_nested:
+                    f_evals_nu = f_evals
+                else:
+                    f_evals_nu = f_evals.get(nu, {})
+                if nu not in f_evals_nu.keys():
+                    f_evals_nu[nu] = f(zero.copy())
+                    self.__n_f_evals_new += 1
+                if not self.__is_nested:
+                    f_evals[nu] = f_evals_nu
+
+                self.__offset = self.__n_2_zetas[n][0] * f_evals_nu[nu]
+                continue
+
+            # ----- Assemble sorted dimensions and sorted degrees -----
+
+            nn = len(nus)  # number of multi-indices of length n
+            sorted_dims = np.empty((nn, n), dtype=int)
+            sorted_degs = np.empty((nn, n), dtype=int)
+
+            for i, nu in enumerate(n_2_nus[n]):
+                sorted_nu = sorted(nu, key=lambda x: x[1], reverse=True)
+                sorted_dims[i], sorted_degs[i] = zip(*sorted_nu)
+
+            # ----- Assemble nodes and weights -----
+
+            tau = tuple(int(ti) for ti in sorted_degs.max(axis=0))  # per-dimension maximal degree tau_i
+            tau_max = max(tau)
+            nodes = np.zeros((nn, n, tau_max + 1), dtype=float)
+            weights = np.zeros((nn, n, tau_max + 1), dtype=float)
+
+            # for each slot t, group i's by (dim,deg) so we only gen once
+            for t in range(n):
+                groups: dict[tuple[int, int], list[int]] = defaultdict(list)
+                for i in range(nn):
+                    dim = int(sorted_dims[i, t])
+                    deg = int(sorted_degs[i, t])
+                    groups[(dim, deg)].append(i)
+
+                # now for each unique (dim,deg) compute pts & wts once
+                for (dim, deg), idxs in groups.items():
+                    pts = self.__node_gen[dim](deg)
+                    wts = barycentric.compute_weights(pts)
+                    nodes[idxs, t, : deg + 1] = pts
+                    weights[idxs, t, : deg + 1] = wts
+                # we can do even better if we vectorize node_gen(degrees) for isotropic rules, like GH or Leja
+
+            # ----- Assemble the array storing the functions evaluations -----
+
+            F = np.zeros((nn, self.__d_out) + tuple(ti + 1 for ti in tau), dtype=float)
+
+            for i, nu in enumerate(n_2_nus[n]):
+                x = zero.copy()
 
                 if self.__is_nested:
                     f_evals_nu = f_evals
                 else:
                     f_evals_nu = f_evals.get(nu, {})
 
-                s_i = self.n_2_sorted_dims[n][i]
-                argsort_s_i = self.n_2_argsort_dims[n][i]
-                F_i = self.n_2_F[n][i]
+                F_i = F[i]
+                s_i = sorted_dims[i]
+                argsort_s_i = np.argsort(s_i)
 
-                ranges = [range(k + 1) for k in self.n_2_sorted_degs[n][i]]
+                ranges = [range(k + 1) for k in sorted_degs[i]]
                 for mu_degrees in it.product(*ranges):
                     mu_tuple = tuple((s_i[i], mu_degrees[i]) for i in argsort_s_i if mu_degrees[i] > 0)
                     if mu_tuple not in f_evals_nu:
-                        x[s_i] = [xi_k[i][deg] for xi_k, deg in zip(nodes, mu_degrees)]
+                        x[s_i] = [xi_k[deg] for xi_k, deg in zip(nodes[i], mu_degrees)]
                         f_evals_nu[mu_tuple] = f(x)
-                        self.n_f_evals_new += 1
+                        self.__n_f_evals_new += 1
                     F_i[:, *mu_degrees] = f_evals_nu[mu_tuple]
 
                 if not self.__is_nested:
                     f_evals[nu] = f_evals_nu
 
-            # cast to jnp data structures
-            self.n_2_F[n] = jnp.array(self.n_2_F[n])
-            self.n_2_nodes[n] = [jnp.array(xi) for xi in self.n_2_nodes[n]]
-            self.n_2_weights[n] = [jnp.array(w) for w in self.n_2_weights[n]]
-            self.n_2_sorted_dims[n] = jnp.array(self.n_2_sorted_dims[n])
-            self.n_2_zetas[n] = jnp.array(self.n_2_zetas[n])
+            # save as jnp data structures
+            self.__n_2_F[n] = jnp.array(F)
+            self.__n_2_sorted_degs[n] = jnp.array(sorted_degs)
+            self.__n_2_sorted_dims[n] = jnp.array(sorted_dims)
+            self.__n_2_nodes[n] = jnp.array(nodes)
+            self.__n_2_weights[n] = jnp.array(weights)
+            self.__n_2_zetas[n] = jnp.array(self.__n_2_zetas[n])
 
-        self.__compile_for_batchsize(batchsize)
+        self.__setup_eval_functions()
 
         return f_evals
 
-    def __compile_for_batchsize(self, batchsize: int) -> None:
+    def __setup_eval_functions(self) -> None:
 
-        def __create_evaluate_tensor_product_interpolant(n: int):
-            def __evaluate_tensor_product_interpolant_wrapped(x, F, *args):
-                xi_list = args[:n]
-                w_list = args[n : 2 * n]
-                s_list = args[2 * n]
-                nu = args[2 * n + 1]
-                zeta = args[2 * n + 2]
-                return barycentric.evaluate_tensor_product_interpolant(x, F, xi_list, w_list, s_list, nu, zeta)
+        self.__compiled_tensor_product_evaluation = jax.jit(
+            jax.vmap(barycentric.evaluate_tensor_product_interpolant, in_axes=(None, 0, 0, 0, 0, 0, 0))
+        )
+        self.__compiled_tensor_product_gradient = jax.jit(
+            jax.vmap(barycentric.evaluate_tensor_product_gradient, in_axes=(None, 0, 0, 0, 0, 0, 0))
+        )
 
-            return jax.vmap(
-                jax.jit(__evaluate_tensor_product_interpolant_wrapped), in_axes=(None, 0) + (0,) * (2 * n + 3)
-            )
+        if self.__n_inputs is not None:
+            _ = self(jax.random.uniform(jax.random.PRNGKey(0), (self.__n_inputs, self.__d_in)))
 
-        def __create_evaluate_tensor_product_gradient(n: int):
-            def __evaluate_tensor_product_gradient_wrapped(x, F, *args):
-                xi_list = args[:n]
-                w_list = args[n : 2 * n]
-                s_list = args[2 * n]
-                nu = args[2 * n + 1]
-                zeta = args[2 * n + 2]
-                return barycentric.evaluate_tensor_product_gradient(x, F, xi_list, w_list, s_list, nu, zeta)
+    def __validate_input(self, x: Union[jax.Array, np.ndarray]) -> Union[jax.Array, np.ndarray]:
+        assert bool(self.__compiled_tensor_product_evaluation) == bool(
+            self.__n_2_F
+        ), "The operator has not yet been set up for a target function via `set_f`."
+        x = jnp.asarray(x)
+        if x.shape == (self.__d_in,):
+            x = x[None, :]
+        assert x.shape[1] == self.__d_in, f"{x.shape[1]} != {self.__d_in}"
+        self.__n_inputs = x.shape[0]
+        return x
 
-            return jax.vmap(jax.jit(__evaluate_tensor_product_gradient_wrapped), in_axes=(None, 0) + (0,) * (2 * n + 3))
-
-        for n in self.n_2_F.keys():
-            self.__compiled_tensor_product_evaluation[n] = __create_evaluate_tensor_product_interpolant(n)
-            self.__compiled_tensor_product_gradient[n] = __create_evaluate_tensor_product_gradient(n)
-
-        if batchsize is not None:
-            inputs = jax.random.uniform(jax.random.PRNGKey(0), (batchsize, self.__d_in))
-            _ = self(inputs)
-            _ = self.gradient(inputs)
-
-    def __call__(self, x: Union[jax.Array, np.ndarray], memory_max_GB: float = 4.0) -> jax.Array:
+    def __call__(self, x: Union[jax.Array, np.ndarray]) -> jax.Array:
         """@public
         Evaluate the Smolyak operator at points `x`.
 
@@ -295,51 +270,39 @@ class SmolyakBarycentricInterpolator:
             Points at which to evaluate the Smolyak interpolant of the target function `f`.
             Shape: `(n_points, d_in)` or `(d_in,)`, where `n_points` is the number of evaluation points
             and `d_in` is the dimension of the input domain.
-        memory_max_GB : float, optional
-            Maximum memory in gigabytes to use during batched evaluation. Controls the batch size
-            to stay within this memory limit. Default is 4.0.
 
         Returns
         -------
         jax.Array
             The interpolant of the target function `f` evaluated at points `x`. Shape: `(n_points, d_out)`
         """
-        assert bool(self.__compiled_tensor_product_evaluation) == bool(
-            self.n_2_F
-        ), "The operator has not yet been compiled for a target function."
-        x = jnp.asarray(x)
-        if x.shape == (self.__d_in,):
-            x = x[None, :]
-        assert x.shape[1] == self.__d_in, f"{x.shape[1]} != {self.__d_in}"
+        x = self.__validate_input(x)
+        I_Lambda_x = jnp.broadcast_to(self.__offset, (self.__n_inputs, self.__d_out))
 
-        I_Lambda_x = jnp.broadcast_to(self.offset, (x.shape[0], self.__d_out))
+        for n in self.__n_2_F.keys():
 
-        for n in self.__compiled_tensor_product_evaluation.keys():
-
-            # determine the number of batches that ensures that the computation stays within the given memory limit
-            n_terms = self.n_2_F[n].shape[0]
-            memory_per_term_GB = I_Lambda_x.size * np.prod(self.n_2_F[n].shape[3:]) * 8 / (1024**3)
-            batch_size = max(1, int(np.floor(memory_max_GB / memory_per_term_GB)))
-            n_batches = int(np.ceil(n_terms / batch_size))
+            n_summands = self.__n_2_F[n].shape[0]
+            memory_per_summand = self.__n_inputs * self.__d_out * np.prod(self.__n_2_F[n].shape[3:]) * 8 / (1024**3)
+            summands_batch_size = max(1, int(np.floor(self.__memory_limit / memory_per_summand)))
 
             # batched processing of tensor product interpolants with n active dimensions
-            for i in range(n_batches):
-                start = i * batch_size
-                end = min((i + 1) * batch_size, n_terms)
-                res = self.__compiled_tensor_product_evaluation[n](
+            for start_s in range(0, n_summands, summands_batch_size):
+
+                end_s = min(start_s + summands_batch_size, n_summands)
+                res = self.__compiled_tensor_product_evaluation(
                     x,
-                    self.n_2_F[n][start:end],
-                    *[arr[start:end] for arr in self.n_2_nodes[n]],
-                    *[arr[start:end] for arr in self.n_2_weights[n]],
-                    self.n_2_sorted_dims[n][start:end],
-                    self.n_2_sorted_degs[n][start:end],
-                    self.n_2_zetas[n][start:end],
+                    self.__n_2_F[n][start_s:end_s],
+                    self.__n_2_nodes[n][start_s:end_s],
+                    self.__n_2_weights[n][start_s:end_s],
+                    self.__n_2_sorted_dims[n][start_s:end_s],
+                    self.__n_2_sorted_degs[n][start_s:end_s],
+                    self.__n_2_zetas[n][start_s:end_s],
                 )
                 I_Lambda_x += jnp.sum(res, axis=0)
 
         return I_Lambda_x
 
-    def gradient(self, x: Union[jax.Array, np.ndarray], memory_max_GB: float = 4.0) -> jax.Array:
+    def gradient(self, x: Union[jax.Array, np.ndarray]) -> jax.Array:
         """
         Compute the gradient of the Smolyak interpolant at the given points.
 
@@ -347,9 +310,6 @@ class SmolyakBarycentricInterpolator:
         ----------
         x : Union[jax.Array, numpy.ndarray]
             Points at which to evaluate the gradient. Shape: `(n_points, d_in)`.
-        memory_max_GB : float, optional
-            Maximum memory in gigabytes to use during batched evaluation. Controls the batch size
-            to stay within this memory limit. Default is 4.0.
 
         Returns
         -------
@@ -357,36 +317,27 @@ class SmolyakBarycentricInterpolator:
             Gradient of the interpolant evaluated at `x`.
             Shape: `(n_points, d_out, d_in)`.
         """
-        assert bool(self.__compiled_tensor_product_evaluation) == bool(
-            self.n_2_F
-        ), "The operator has not yet been compiled for a target function."
-        x = jnp.asarray(x)
-        if x.shape == (self.__d_in,):
-            x = x[None, :]
-        assert x.shape[1] == self.__d_in, f"{x.shape[1]} != {self.__d_in}"
-
+        x = self.__validate_input(x)
         J_Lambda_x = jnp.zeros((x.shape[0], self.__d_out, self.__d_in))
 
-        for n in self.__compiled_tensor_product_gradient.keys():
+        for n in self.__n_2_F.keys():
 
             # determine the number of batches that ensures that the computation stays within the given memory limit
-            n_terms = self.n_2_F[n].shape[0]
-            memory_per_term_GB = J_Lambda_x.size * np.prod(self.n_2_F[n].shape[3:]) * 8 / (1024**3)
-            batch_size = max(1, int(np.floor(memory_max_GB / memory_per_term_GB)))
-            n_batches = int(np.ceil(n_terms / batch_size))
+            n_summands = self.__n_2_F[n].shape[0]
+            memory_per_summand = J_Lambda_x.size * np.prod(self.__n_2_F[n].shape[3:]) * 8 / (1024**3)
+            summands_batch_size = max(1, int(np.floor(self.__memory_limit / memory_per_summand)))
 
             # batched processing of tensor product gradients with n active dimensions
-            for i in range(n_batches):
-                start = i * batch_size
-                end = min((i + 1) * batch_size, n_terms)
-                res = self.__compiled_tensor_product_gradient[n](
+            for start_s in range(0, n_summands, summands_batch_size):
+                end_s = min(start_s + summands_batch_size, n_summands)
+                res = self.__compiled_tensor_product_gradient(
                     x,
-                    self.n_2_F[n][start:end],
-                    *[arr[start:end] for arr in self.n_2_nodes[n]],
-                    *[arr[start:end] for arr in self.n_2_weights[n]],
-                    self.n_2_sorted_dims[n][start:end],
-                    self.n_2_sorted_degs[n][start:end],
-                    self.n_2_zetas[n][start:end],
+                    self.__n_2_F[n][start_s:end_s],
+                    self.__n_2_nodes[n][start_s:end_s],
+                    self.__n_2_weights[n][start_s:end_s],
+                    self.__n_2_sorted_dims[n][start_s:end_s],
+                    self.__n_2_sorted_degs[n][start_s:end_s],
+                    self.__n_2_zetas[n][start_s:end_s],
                 )
                 J_Lambda_x += jnp.sum(res, axis=0)
 
@@ -402,17 +353,15 @@ class SmolyakBarycentricInterpolator:
         jax.Array
             Integral of the interpolant. Shape: `(d_out,)`.
         """
-        # assemble quadrature weights, closely following the logic in __init_nodes_and_weights
+        # assemble quadrature weights, closely following the logic in set_f to assemble nodes and weights
         # ----------------------------------------------------------------------------
         n_2_quad_weights = {}
 
-        for n, nus in self.n_2_nus.items():
-            if n == 0:
-                continue
+        for n in self.__n_2_F.keys():
 
-            nn = len(nus)  # number of multi-indices of length n
-            sorted_degs = self.n_2_sorted_degs[n]
-            sorted_dims = self.n_2_sorted_dims[n]
+            nn = len(self.__n_2_zetas[n])  # number of multi-indices of length n
+            sorted_degs = self.__n_2_sorted_degs[n]
+            sorted_dims = self.__n_2_sorted_dims[n]
             tau = tuple(int(ti) for ti in sorted_degs.max(axis=0))  # per-dimension maximal degree tau_i
 
             weights_list = [np.zeros((nn, tau_i + 1), dtype=float) for tau_i in tau]
@@ -436,11 +385,11 @@ class SmolyakBarycentricInterpolator:
 
             return jax.vmap(jax.jit(__evaluate_tensor_product_quadrature_wrapped), in_axes=(0,) * (n + 1))
 
-        Q_Lambda = jnp.broadcast_to(self.offset, self.__d_out)
-        for n in self.n_2_F.keys():
+        Q_Lambda = jnp.broadcast_to(self.__offset, self.__d_out)
+        for n in self.__n_2_F.keys():
             quadrature_func_n = __create_evaluate_tensor_product_quadrature(n)
 
-            res = quadrature_func_n(self.n_2_F[n], *n_2_quad_weights[n])
+            res = quadrature_func_n(self.__n_2_F[n], *n_2_quad_weights[n])
 
-            Q_Lambda += jnp.tensordot(self.n_2_zetas[n], res, axes=1)
+            Q_Lambda += jnp.tensordot(self.__n_2_zetas[n], res, axes=1)
         return Q_Lambda.block_until_ready()
