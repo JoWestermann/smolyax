@@ -2,6 +2,7 @@
 Utility functionality for barycentric interpolation.
 """
 
+import string
 from typing import Sequence, Union
 
 import jax
@@ -110,17 +111,29 @@ def evaluate_tensor_product_interpolant(
         The evaluated tensor product interpolant at the points specified by `x`.
         The shape of the output will be `(n_points, d_out)`.
     """
-    idx = F.shape[1]
-    b = evaluate_basis_unnormalized(x[:, [sorted_dims[0]]], xi_list[0][:idx], w_list[0][:idx], sorted_degs[0])
-    F = jnp.einsum("ij,kj...->ik...", b, F)
-    norm = jnp.sum(b, axis=1)
 
-    for i, (si, nui, ni, wi) in enumerate(zip(sorted_dims[1:], sorted_degs[1:], xi_list[1:], w_list[1:])):
-        idx = F.shape[2]
-        b = evaluate_basis_unnormalized(x[:, [si]], ni[:idx], wi[:idx], nui)
-        F = jnp.einsum("ij,ikj...->ik...", b, F)
-        norm *= jnp.sum(b, axis=1)
-    return zeta * F / norm[:, None]
+    bs = [
+        evaluate_basis_unnormalized(x[:, [si]], ni[:i], wi[:i], nui)
+        for (i, si, nui, ni, wi) in zip(F.shape[1:], sorted_dims, sorted_degs, xi_list, w_list)
+    ]
+    m = len(bs)
+
+    letters = string.ascii_letters
+    f_labels = letters[: F.ndim]
+    sample_label = letters[F.ndim]
+    contr_labels = f_labels[1 : 1 + m]
+
+    subscripts = (
+        ",".join([f_labels, *[sample_label + li for li in contr_labels]])
+        + "->"
+        + sample_label
+        + f_labels[0]
+        + "".join(f_labels[1 + m :])
+    )
+
+    out = jnp.einsum(subscripts, F, *bs)
+    norm = jnp.prod(jnp.stack([b.sum(axis=1) for b in bs], axis=0), axis=0)
+    return zeta * out / norm[:, None]
 
 
 def evaluate_basis_gradient_unnormalized(x: jax.Array, xi: jax.Array, w: jax.Array, nu_i: int) -> jax.Array:
