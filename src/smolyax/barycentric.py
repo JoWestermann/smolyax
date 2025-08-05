@@ -111,25 +111,14 @@ def evaluate_tensor_product_interpolant(
         The evaluated tensor product interpolant at the points specified by `x`.
         The shape of the output will be `(n_points, d_out)`.
     """
-
     bs = [
         evaluate_basis_unnormalized(x[:, [si]], ni[:i], wi[:i], nui)
         for (i, si, nui, ni, wi) in zip(F.shape[1:], sorted_dims, sorted_degs, xi_list, w_list)
     ]
-    m = len(bs)
 
-    letters = string.ascii_letters
-    f_labels = letters[: F.ndim]
-    sample_label = letters[F.ndim]
-    contr_labels = f_labels[1 : 1 + m]
-
-    subscripts = (
-        ",".join([f_labels, *[sample_label + li for li in contr_labels]])
-        + "->"
-        + sample_label
-        + f_labels[0]
-        + "".join(f_labels[1 + m :])
-    )
+    F_axes = string.ascii_letters[: F.ndim]
+    in_axis = string.ascii_letters[F.ndim]
+    subscripts = f"{','.join([F_axes]+[in_axis+F_axis for F_axis in F_axes[1:]])}->{in_axis}{F_axes[0]}"
 
     out = jnp.einsum(subscripts, F, *bs)
     norm = jnp.prod(jnp.stack([b.sum(axis=1) for b in bs], axis=0), axis=0)
