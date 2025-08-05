@@ -1,4 +1,5 @@
 import itertools as it
+import string
 from collections import defaultdict
 from typing import Callable, Sequence, Union
 
@@ -6,7 +7,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from . import barycentric, indices, nodes, quadrature
+from . import barycentric, indices, nodes
 
 jax.config.update("jax_enable_x64", True)
 
@@ -379,17 +380,11 @@ class SmolyakBarycentricInterpolator:
 
         # jit compile and evaluate tensor product terms
         # ----------------------------------------------------------------------------
-        def __create_evaluate_tensor_product_quadrature(n: int):
-            def __evaluate_tensor_product_quadrature_wrapped(F, *w_list):
-                return quadrature.evaluate_tensor_product_quadrature(F, w_list)
-
-            return jax.vmap(jax.jit(__evaluate_tensor_product_quadrature_wrapped), in_axes=(0,) * (n + 1))
-
         Q_Lambda = jnp.broadcast_to(self.__offset, self.__d_out)
         for n in self.__n_2_F.keys():
-            quadrature_func_n = __create_evaluate_tensor_product_quadrature(n)
-
-            res = quadrature_func_n(self.__n_2_F[n], *n_2_quad_weights[n])
-
-            Q_Lambda += jnp.tensordot(self.__n_2_zetas[n], res, axes=1)
+            q_id = "z"
+            w_ids = string.ascii_lowercase[:n]
+            o_id = string.ascii_lowercase[n]
+            subscripts = f"{q_id}," + ",".join(f"{q_id}{w}" for w in w_ids) + f",{q_id}{o_id}{''.join(w_ids)}->{o_id}"
+            Q_Lambda += jnp.einsum(subscripts, self.__n_2_zetas[n], *n_2_quad_weights[n], self.__n_2_F[n])
         return Q_Lambda.block_until_ready()
