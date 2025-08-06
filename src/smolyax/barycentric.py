@@ -111,18 +111,16 @@ def evaluate_tensor_product_interpolant(
         The evaluated tensor product interpolant at the points specified by `x`.
         The shape of the output will be `(n_points, d_out)`.
     """
-    bs = [
-        evaluate_basis_unnormalized(x[:, [si]], ni[:i], wi[:i], nui)
-        for (i, si, nui, ni, wi) in zip(F.shape[1:], sorted_dims, sorted_degs, xi_list, w_list)
-    ]
+    bs = []
+    for i, si, nui, ni, wi in zip(F.shape[1:], sorted_dims, sorted_degs, xi_list, w_list):
+        b = evaluate_basis_unnormalized(x[:, [si]], ni[:i], wi[:i], nui)
+        bs.append(b / b.sum(axis=1)[:, None])
 
     F_axes = string.ascii_letters[: F.ndim]
     in_axis = string.ascii_letters[F.ndim]
     subscripts = f"{','.join([F_axes]+[in_axis+F_axis for F_axis in F_axes[1:]])}->{in_axis}{F_axes[0]}"
 
-    out = jnp.einsum(subscripts, F, *bs)
-    norm = jnp.prod(jnp.stack([b.sum(axis=1) for b in bs], axis=0), axis=0)
-    return zeta * out / norm[:, None]
+    return zeta * jnp.einsum(subscripts, F, *bs)
 
 
 def evaluate_basis_gradient_unnormalized(x: jax.Array, xi: jax.Array, w: jax.Array, nu_i: int) -> jax.Array:
@@ -236,7 +234,5 @@ def evaluate_tensor_product_gradient(
 
         F = jnp.einsum("ihj,ikhj...->ikh...", B, F)
 
-    result = jnp.zeros((n_points, d_out, d_in))
-    for i, si in enumerate(sorted_dims):
-        result = result.at[:, :, si].set(F[:, :, i])
+    result = jnp.zeros((n_points, d_out, d_in)).at[:, :, sorted_dims].set(F)
     return zeta * result
