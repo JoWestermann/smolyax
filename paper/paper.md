@@ -47,20 +47,15 @@ header-includes:
 
 # Summary
 
-The `smolyax` library provides interpolation capabilities for arbitrary multivariate and vector-valued functions $f : \mathbb{R}^{d_1} \to \mathbb{R}^{d_2}$ for any $d_1, d_2 \in \mathbb{N}$.
+The `smolyax` library provides interpolation capabilities for arbitrary multivariate and vector-valued functions $f : \mathbb{R}^{d_{\rm in}} \to \mathbb{R}^{d_{\rm out}}$ for any $d_{\rm in}, d_{\rm out} \in \mathbb{N}$. It implements the Smolyak interpolation operator, which is known to overcome the curse-of-dimensionality plaguing naive multivariate interpolation [@barthelmann:2000] and uses the barycentric interpolation formula [@berrut:2004] for numerical stability. The implementation is based on JAX [@jax:2018], a free and open-source Python library for high-performance computing that integrates with the Python and NumPy numerical computing ecosystem. Thanks to JAX's device management, `smolyax` runs natively on both CPU and GPU. While implementing Smolyak interpolation in JAX is challenging due to the highly irregular data structures involved, `smolyax` overcomes this by employing a tailored batching and padding strategy that enables efficient vectorization.
 
-It implements the Smolyak interpolation operator, which is known to overcome the curse-of-dimensionality plaguing naive multivariate interpolation [@barthelmann:2000] and uses the barycentric interpolation formula [@berrut:2004] for numerical stability. The implementation is based on JAX [@jax:2018], a free and open-source Python library for high-performance computing that integrates with the Python and NumPy numerical computing ecosystem. Thanks to JAX's device management, `smolyax` runs natively on both CPU and GPU. While implementing Smolyak interpolation in JAX is challenging due to the highly irregular data structures involved, `smolyax` overcomes this by employing a tailored batching and padding strategy that enables efficient vectorization.
-
-`smolyax` supports interpolation on bounded or unbounded domains via Leja [@chkifa:2013] or Gauss-Hermite [@abramowitz:1964] node sequences, respectively. It provides efficient Numba-accelerated routines to generate isotropic or anisotropic total degree multi-index sets [@adcock:2022, §2.3.2], which are the key ingredient to generate the high-dimensional sparse grids [@bungartz:2004] of interpolation nodes required by the Smolyak interpolation operator. Additional types of node sequences or multi-index sets can be incorporated easily by implementing a minimalistic interface.
-The `smolyax` interpolant provides further functionality to evaluate its gradient as well as compute its integral.
+`smolyax` supports interpolation on bounded or unbounded domains via Leja [@chkifa:2013] or Gauss-Hermite [@abramowitz:1964] node sequences, respectively. It provides efficient Numba-accelerated routines to generate isotropic or anisotropic total degree multi-index sets [@adcock:2022, §2.3.2], which are the key ingredient to generate the high-dimensional sparse grids [@bungartz:2004] of interpolation nodes required by the Smolyak interpolation operator. Additional types of node sequences or multi-index sets can be incorporated easily by implementing a minimalistic interface. The `smolyax` interpolant provides further functionality to evaluate its gradient as well as compute its integral.
 
 # Statement of Need
 
-Polynomial expansion is a well-studied and powerful tool in applied mathematics, with important applications in surrogate modeling, uncertainty quantification and inverse problems, see e.g. [@adcock:2022; @dung:2023; @zech:2018; @chkifa:2015; @herrmann:2024; @westermann:2025] and references therein.
+Polynomial expansion is a well-studied and powerful tool in applied mathematics, with important applications in surrogate modeling, uncertainty quantification and inverse problems, see e.g. [@adcock:2022; @dung:2023; @zech:2018; @chkifa:2015; @herrmann:2024; @westermann:2025] and references therein. Smolyak interpolation offers a practical way to construct polynomial approximations with known error bounds for a wide range of function classes, see e.g. [@barthelmann:2000; @chkifa:2015; @adcock:2022].
 
-Smolyak interpolation offers a practical way to construct polynomial approximations with known error bounds for a wide range of function classes, see e.g. [@barthelmann:2000; @chkifa:2015; @adcock:2022].
-
-While several libraries provide high-dimensional interpolation functionality, see e.g. [@feinberg:2015; @marelli:2014; @piazzola:2024; @jakeman:2023; @parno:2021; @tate:2023], none, to our knowledge, provides a both CPU- and GPU-compatible, high performance implementation of the Smolyak interpolation operator. `smolyax` addresses this gap by providing an efficient solution within the popular JAX ecosystem.
+Several libraries provide CPU-based high-dimensional interpolation functionality, for example `Chaospy` [@feinberg:2015], `UQLab` [@marelli:2014], `The Sparse Grid Matlab Kit` [@piazzola:2024], `PyApprox` [@jakeman:2023], `MUQ` [@parno:2021] or `UncertainSCI` [@tate:2023]. The GPU support that is in practice necessary to go from moderate to high dimensions is offered so far only by `Tasmanian` [@tasmanian]. Benchmark experiments suggest that while asymptotic runtime of the Smolyak interpolator in `Tasmanian` scale better as the output dimensions $d_{\rm out}$ increases, `smolyax` offers competitive asymptotic runtimes for increasing $d_{\rm in}$ and input data set size.
 
 # A vectorizable implementation of the Smolyak operator
 
@@ -70,9 +65,9 @@ Tensorized interpolation generalizes univariate interpolation to multivariate fu
 Since $I^\bsnu[f] \in \bbP_\bsnu := {\rm span} \set{\bsx^\bsmu}{\bsmu \leq \bsnu}$, this approach suffers from the curse of dimensionality as $d$ increases.
 
 Smolyak interpolation [@smolyak:1963; @barthelmann:2000] overcomes this issue by introducing polynomial ansatz spaces $\bbP_\Lambda := {\rm span} \set{\bsx^\bsmu}{\bsmu \in \Lambda}$ parametrized by downward closed multi-index sets $\Lambda \subset \N_0^d$. The resulting interpolation operator is a linear combination of tensorized interpolation operators:
-\begin{equation} \label{eq:ip_smolyak}
+\begin{equation*} \label{eq:ip_smolyak}
     I^\Lambda := \sum \limits_{\bsnu \in \Lambda} \zeta_{\Lambda, \bsnu} I^\bsnu, \qquad \zeta_{\Lambda, \bsnu} := \sum \limits_{\bse \in \{0,1\}^d : \bsnu+\bse \in \Lambda} (-1)^{|\bse|}.
-\end{equation}
+\end{equation*}
 
 Implementing this operator in a vectorized form suitable for high-performance computing is nontrivial, as vectorization requires inputs to conform to a uniform structure. However, each tensorized interpolant in \eqref{eq:ip_smolyak} involves reducing a higher-order tensor of unique shape $\bsnu$ via multiplication with one vector per dimension. A naive strategy would be to zero-pad all tensors in \eqref{eq:ip_smolyak} to the smallest common shape $(\max_{\bsnu \in \Lambda}(\nu_j))_{j=1}^d$. This, however, reintroduces the curse of dimensionality, as memory requirements grow exponentially with $d$.
 
@@ -82,7 +77,7 @@ Implementing this operator in a vectorized form suitable for high-performance co
 \item[2.] Permuting the remaining active dimensions in descending order, and
 \item[3.] Zero-padding all tensors with the same number of active dimensions to the smallest common shape.
 \end{itemize}
-This reorganizes the tensors into a small number of large, structured data blocks that can be processed in a fast, vectorized way. Asymptotically in both the dimension and the size of the polynomial space, this approach does not consume more memory than the original bare tensors, up to a small constant.
+This reorganizes the tensors into a few large, structured blocks enabling fast vectorized processing. Asymptotically, in both dimension and size of the polynomial space, the method requires only a logarithmic-factor increase in overall memory compared with the raw tensors.
 
 # Acknowledgements
 
