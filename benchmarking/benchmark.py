@@ -173,8 +173,7 @@ if __name__ == "__main__":
 
         print(f'D_in = {d_in}')
         f_dummy, r_dummy, theta_dummy = testfunction.build_test_function(d_in, 1)
-        aniso_t = testfunction.anisotropy_weights(d_in, r_dummy[0], theta_dummy[0])
-        aniso_t = list(np.maximum(1.0, np.ceil(1000 * np.log(((np.arange(d_in) + 2) ** r0) / theta0))).astype(int))
+        aniso_t = list(np.maximum(1.0, np.ceil(1000 * np.log(((np.arange(d_in) + 2) ** r_dummy) / theta_dummy))).astype(int))
         aniso_s = [np.log(((j + 2) ** r_dummy) / theta_dummy) for j in range(d_in)]
         depth_for_N = depthmap.get_depth_map(d_in, TARGET_N_LIST, aniso_t)
 

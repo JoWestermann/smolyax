@@ -24,6 +24,6 @@ def build_test_function(d_in: int, d_out: int):
         dot = x_arr @ j_mat.T
         return 1.0 / (1.0 + theta * dot)
 
-    return f, r, theta
+    return f, BASE_R, BASE_THETA
 
 
