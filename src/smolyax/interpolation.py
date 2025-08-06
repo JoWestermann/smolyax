@@ -93,7 +93,7 @@ class SmolyakBarycentricInterpolator:
         self.__n_f_evals_new = 0
 
         self.__compiled_tensor_product_evaluation = None
-        self.__compiled_tensor_product_gradient = None
+        self.__compiled_tensor_product_gradient = {}
 
         self.__memory_limit = memory_limit
         self.__n_inputs = n_inputs
@@ -167,9 +167,8 @@ class SmolyakBarycentricInterpolator:
             # ----- Assemble nodes and weights -----
 
             tau = tuple(int(ti) for ti in sorted_degs.max(axis=0))  # per-dimension maximal degree tau_i
-            tau_max = max(tau)
-            nodes = np.zeros((nn, n, tau_max + 1), dtype=float)
-            weights = np.zeros((nn, n, tau_max + 1), dtype=float)
+            nodes = [np.zeros((nn, tau_i + 1), dtype=float) for tau_i in tau]
+            weights = [np.zeros((nn, tau_i + 1), dtype=float) for tau_i in tau]
 
             # for each slot t, group i's by (dim,deg) so we only gen once
             for t in range(n):
@@ -183,8 +182,10 @@ class SmolyakBarycentricInterpolator:
                 for (dim, deg), idxs in groups.items():
                     pts = self.__node_gen[dim](deg)
                     wts = barycentric.compute_weights(pts)
-                    nodes[idxs, t, : deg + 1] = pts
-                    weights[idxs, t, : deg + 1] = wts
+                    L = len(pts)
+                    nodes[t][idxs, :L] = pts
+                    weights[t][idxs, :L] = wts
+
                 # we can do even better if we vectorize node_gen(degrees) for isotropic rules, like GH or Leja
 
             # ----- Assemble the array storing the functions evaluations -----
@@ -207,7 +208,7 @@ class SmolyakBarycentricInterpolator:
                 for mu_degrees in it.product(*ranges):
                     mu_tuple = tuple((s_i[i], mu_degrees[i]) for i in argsort_s_i if mu_degrees[i] > 0)
                     if mu_tuple not in f_evals_nu:
-                        x[s_i] = [xi_k[deg] for xi_k, deg in zip(nodes[i], mu_degrees)]
+                        x[s_i] = [xi_k[i][deg] for xi_k, deg in zip(nodes, mu_degrees)]
                         f_evals_nu[mu_tuple] = f(x)
                         self.__n_f_evals_new += 1
                     F_i[:, *mu_degrees] = f_evals_nu[mu_tuple]
@@ -219,8 +220,8 @@ class SmolyakBarycentricInterpolator:
             self.__n_2_F[n] = jnp.array(F)
             self.__n_2_sorted_degs[n] = jnp.array(sorted_degs)
             self.__n_2_sorted_dims[n] = jnp.array(sorted_dims)
-            self.__n_2_nodes[n] = jnp.array(nodes)
-            self.__n_2_weights[n] = jnp.array(weights)
+            self.__n_2_nodes[n] = [jnp.array(xi) for xi in nodes]
+            self.__n_2_weights[n] = [jnp.array(w) for w in weights]
             self.__n_2_zetas[n] = jnp.array(self.__n_2_zetas[n])
 
         self.__setup_eval_functions()
@@ -229,12 +230,22 @@ class SmolyakBarycentricInterpolator:
 
     def __setup_eval_functions(self) -> None:
 
-        self.__compiled_tensor_product_evaluation = jax.jit(
-            jax.vmap(barycentric.evaluate_tensor_product_interpolant, in_axes=(None, 0, 0, 0, 0, 0, 0))
-        )
-        self.__compiled_tensor_product_gradient = jax.jit(
-            jax.vmap(barycentric.evaluate_tensor_product_gradient, in_axes=(None, 0, 0, 0, 0, 0, 0))
-        )
+        def __create_evaluate_tensor_product_gradient(n: int):
+            def __evaluate_tensor_product_gradient_wrapped(x, F, *args):
+                xi_list = args[:n]
+                w_list = args[n : 2 * n]
+                s_list = args[2 * n]
+                nu = args[2 * n + 1]
+                zeta = args[2 * n + 2]
+                return barycentric.evaluate_tensor_product_gradient(x, F, xi_list, w_list, s_list, nu, zeta)
+
+            return jax.vmap(jax.jit(__evaluate_tensor_product_gradient_wrapped), in_axes=(None, 0) + (0,) * (2 * n + 3))
+
+        for n in self.__n_2_F.keys():
+            self.__compiled_tensor_product_gradient[n] = __create_evaluate_tensor_product_gradient(n)
+
+        self.__compiled_tensor_product_gradient = barycentric.evaluate_tensor_product_gradient
+        self.__compiled_tensor_product_evaluation = barycentric.evaluate_tensor_product_interpolant
 
         if self.__n_inputs is not None:
             _ = self(jax.random.uniform(jax.random.PRNGKey(0), (self.__n_inputs, self.__d_in)))
@@ -272,7 +283,9 @@ class SmolyakBarycentricInterpolator:
         for n in self.__n_2_F.keys():
 
             n_summands = self.__n_2_F[n].shape[0]
-            memory_per_summand = self.__n_inputs * self.__d_out * np.prod(self.__n_2_F[n].shape[3:]) * 8 / (1024**3)
+            memory_per_summand = (
+                self.__n_inputs**1.5 * self.__d_out * np.prod(self.__n_2_F[n].shape[3:]) * 8 / (1024**3)
+            )
             summands_batch_size = max(1, int(np.floor(self.__memory_limit / memory_per_summand)))
 
             # batched processing of tensor product interpolants with n active dimensions
@@ -282,13 +295,13 @@ class SmolyakBarycentricInterpolator:
                 res = self.__compiled_tensor_product_evaluation(
                     x,
                     self.__n_2_F[n][start_s:end_s],
-                    self.__n_2_nodes[n][start_s:end_s],
-                    self.__n_2_weights[n][start_s:end_s],
+                    [arr[start_s:end_s] for arr in self.__n_2_nodes[n]],
+                    [arr[start_s:end_s] for arr in self.__n_2_weights[n]],
                     self.__n_2_sorted_dims[n][start_s:end_s],
                     self.__n_2_sorted_degs[n][start_s:end_s],
                     self.__n_2_zetas[n][start_s:end_s],
                 )
-                I_Lambda_x += jnp.sum(res, axis=0)
+                I_Lambda_x += res
 
         return I_Lambda_x
 
@@ -323,13 +336,13 @@ class SmolyakBarycentricInterpolator:
                 res = self.__compiled_tensor_product_gradient(
                     x,
                     self.__n_2_F[n][start_s:end_s],
-                    self.__n_2_nodes[n][start_s:end_s],
-                    self.__n_2_weights[n][start_s:end_s],
+                    [arr[start_s:end_s] for arr in self.__n_2_nodes[n]],
+                    [arr[start_s:end_s] for arr in self.__n_2_weights[n]],
                     self.__n_2_sorted_dims[n][start_s:end_s],
                     self.__n_2_sorted_degs[n][start_s:end_s],
                     self.__n_2_zetas[n][start_s:end_s],
                 )
-                J_Lambda_x += jnp.sum(res, axis=0)
+                J_Lambda_x += res  # jnp.sum(res, axis=0)
 
         return J_Lambda_x
 
