@@ -205,22 +205,10 @@ def evaluate_tensor_product_gradient(
     d_in = x.shape[1]
     n_points = x.shape[0]
 
-    idx = F.shape[1]
-    b = evaluate_basis_unnormalized(x[:, [sorted_dims[0]]], xi_list[0][:idx], w_list[0][:idx], sorted_degs[0])
-    b_norm = jnp.sum(b, axis=1)[:, None]
+    Bs = []
+    for i, (si, nui, ni, wi) in enumerate(zip(sorted_dims, sorted_degs, xi_list, w_list)):
 
-    db = evaluate_basis_gradient_unnormalized(x[:, [sorted_dims[0]]], xi_list[0][:idx], w_list[0][:idx], sorted_degs[0])
-    db_norm = jnp.sum(db, axis=1)[:, None]
-
-    b = b / b_norm
-    B_i = db / b_norm - b * db_norm / b_norm
-    B = jnp.tile(b[:, None, :], (1, n, 1))
-    B = B.at[:, 0, :].set(B_i)
-
-    F = jnp.einsum("ihj,kj...->ikh...", B, F)
-
-    for i, (si, nui, ni, wi) in enumerate(zip(sorted_dims[1:], sorted_degs[1:], xi_list[1:], w_list[1:])):
-        idx = F.shape[3]
+        idx = F.shape[i+1]
         b = evaluate_basis_unnormalized(x[:, [si]], ni[:idx], wi[:idx], nui)
         b_norm = jnp.sum(b, axis=1)[:, None]
 
@@ -230,9 +218,12 @@ def evaluate_tensor_product_gradient(
         b = b / b_norm
         B_i = db / b_norm - b * db_norm / b_norm
         B = jnp.tile(b[:, None, :], (1, n, 1))
-        B = B.at[:, i + 1, :].set(B_i)
+        B = B.at[:, i, :].set(B_i)
+        Bs.append(B)
 
-        F = jnp.einsum("ihj,ikhj...->ikh...", B, F)
+    dims = string.ascii_letters[3: n + 3]
+    subscripts = ",".join([f"b{''.join(dims)}"] + [f"ac{j}" for j in dims]) + "->abc"
+    F = jnp.einsum(subscripts, F, *Bs)
 
     result = jnp.zeros((n_points, d_out, d_in)).at[:, :, sorted_dims].set(F)
     return zeta * result
