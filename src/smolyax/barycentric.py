@@ -208,7 +208,7 @@ def evaluate_tensor_product_gradient(
     Bs = []
     for i, (si, nui, ni, wi) in enumerate(zip(sorted_dims, sorted_degs, xi_list, w_list)):
 
-        idx = F.shape[i+1]
+        idx = F.shape[i + 1]
         b = evaluate_basis_unnormalized(x[:, [si]], ni[:idx], wi[:idx], nui)
         b_norm = jnp.sum(b, axis=1)[:, None]
 
@@ -221,7 +221,7 @@ def evaluate_tensor_product_gradient(
         B = B.at[:, i, :].set(B_i)
         Bs.append(B)
 
-    dims = string.ascii_letters[3: n + 3]
+    dims = string.ascii_letters[3 : n + 3]
     subscripts = ",".join([f"b{''.join(dims)}"] + [f"ac{j}" for j in dims]) + "->abc"
     F = jnp.einsum(subscripts, F, *Bs)
 
