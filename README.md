@@ -31,7 +31,7 @@ in well less under $0.1$ seconds on a contemporary laptop CPU.
 
 ### Dependencies
 
-`smolyax` requires `python >= 3.11`. Core dependencies are `jax` and `numba`, for more details see [pyproject.toml](https://github.com/JoWestermann/smolyax/blob/main/pyproject.toml).
+`smolyax` requires `python >= 3.9`. Core dependencies are `jax` and `numba`, for more details see [pyproject.toml](https://github.com/JoWestermann/smolyax/blob/main/pyproject.toml).
 
 ### Installation
 
