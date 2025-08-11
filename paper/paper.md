@@ -19,8 +19,8 @@ affiliations:
  - name: Heidelberg University, Germany
    ror: 038t36y30
    index: 1
- - name: The University of Texas at Austin, USA
-   ror: 00hj54h04
+ - name: Colorado State University, USA
+   ror: 03k1gpj17
    index: 2
 date: 28 February 2025
 bibliography: paper.bib
