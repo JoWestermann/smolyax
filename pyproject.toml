@@ -10,7 +10,8 @@ authors = [
     { name = "Josephine Westermann" },
     { name = "Joshua Chen", email = "joshuawchen@icloud.com" }
 ]
-license = { text = "MIT" }
+readme = "README.md"
+license = { file = "LICENSE" }
 dependencies = [
     "jax >= 0.4.30",
     "numba >= 0.60.0"
@@ -40,14 +41,14 @@ dev = [
 
 [tool.black]
 line-length = 120
-target-version = ['py311']
+target-version = ["py39"]
 
 [tool.flake8]
 max-line-length = 120
 extend-ignore = """E203"""
 
 [tool.pytype]
-python_version = "3.11"
+python_version = "3.9"
 inputs = ["src/smolyax"]
 disable = ["import-error"]
 
