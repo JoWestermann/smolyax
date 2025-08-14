@@ -55,7 +55,7 @@ The `smolyax` library provides interpolation capabilities for arbitrary multivar
 
 Polynomial expansion is a well-studied and powerful tool in applied mathematics, with important applications in surrogate modeling, uncertainty quantification and inverse problems, see e.g., @adcock:2022, @dung:2023, @zech:2018, @chkifa:2015, @herrmann:2024, @westermann:2025, and references therein. Smolyak interpolation offers a practical way to construct polynomial approximations with known error bounds for a wide range of function classes, see e.g., @barthelmann:2000, @chkifa:2015, and @adcock:2022.
 
-Several libraries provide CPU-based high-dimensional interpolation functionality, for example `Chaospy` [@feinberg:2015], `UQLab` [@marelli:2014], `The Sparse Grid Matlab Kit` [@piazzola:2024], `PyApprox` [@jakeman:2023], `MUQ` [@parno:2021], and `UncertainSCI` [@tate:2023]. The GPU support that is necessary in practice to go from moderate to high dimensions is offered so far only by `Tasmanian` [@tasmanian]. Benchmark experiments suggest that while asymptotic runtime of the Smolyak interpolator in `Tasmanian` scale better as the output dimensions $d_{\rm out}$ increases, `smolyax` offers competitive asymptotic runtimes for increasing $d_{\rm in}$ and input data set size.
+Several libraries provide CPU-based high-dimensional interpolation functionality, for example `Chaospy` [@feinberg:2015], `UQLab` [@marelli:2014], `The Sparse Grid Matlab Kit` [@piazzola:2024], `PyApprox` [@jakeman:2023], `MUQ` [@parno:2021], and `UncertainSCI` [@tate:2023]. The GPU support that is necessary in practice to go from moderate to high dimensions is offered so far only by `Tasmanian` [@tasmanian]. Benchmark experiments suggest that while asymptotic runtime of the Smolyak interpolator in `Tasmanian` scale better as the output dimension $d_{\rm out}$ increases, `smolyax` offers competitive asymptotic runtimes for increasing $d_{\rm in}$ and input data set size.
 
 # A vectorizable implementation of the Smolyak operator
 
@@ -73,8 +73,8 @@ Implementing this operator in a vectorized form suitable for high-performance co
 
 `smolyax` strikes a balance between handling small, uniquely shaped tensors and large, identically shaped ones. The key idea is to group tensors by their number of active dimensions and prepare them for vectorized processing within each group. In particular, this involves
 \begin{itemize}
-\item[1.] Dropping indices ("\textit{squeezing}") of non-active dimensions, i.e., $j$ with $\nu_j = 0$.
-\item[2.] Permuting the remaining active dimensions in descending order, and
+\item[1.] Dropping indices ("\textit{squeezing}") of non-active dimensions, i.e., $j$ with $\nu_j = 0$;
+\item[2.] Permuting the remaining active dimensions in descending order; and
 \item[3.] Zero-padding all tensors with the same number of active dimensions to the smallest common shape.
 \end{itemize}
 This reorganizes the tensors into a few large, structured blocks enabling fast vectorized processing. Asymptotically, in both dimension and size of the polynomial space, the method requires only a logarithmic-factor increase in overall memory compared with the raw tensors.
