@@ -1,3 +1,5 @@
+[![DOI](https://joss.theoj.org/papers/10.21105/joss.08505/status.svg)](https://doi.org/10.21105/joss.08505)
+
 # Smolyax
 
 Fast interpolation of high-dimensional and vector-valued functions
@@ -24,7 +26,7 @@ in well less under $0.1$ seconds on a contemporary laptop CPU.
 
 ### Documentation
 
-- For an introduction to relevant literature and the key implementation concepts, see the [JOSS paper (under review)](https://github.com/JoWestermann/smolyax/blob/main/paper/paper.md) accompanying this repository.
+- For an introduction to relevant literature and the key implementation concepts, see the [JOSS paper](https://joss.theoj.org/papers/10.21105/joss.08505) accompanying this repository.
 - For code documentation see [here](https://jowestermann.github.io/smolyax/smolyax.html).
 
 ## Get started
@@ -108,15 +110,19 @@ pytest --benchmark-only --benchmark-compare=0001_baseline --benchmark-sort=name 
 
 ## Cite
 
-If you used this library for your research, please cite [the paper (under review)]():
+If you used this library for your research, please cite it as:
 
 ```
-@article{westermann2025smolyax
-  title={smolyax: a high-performance implementation of the Smolyak interpolation operator},
+@article{westermann2025smolyax,
+  title={Smolyax: a high-performance implementation of the {S}molyak interpolation operator},
   author={Westermann, Josephine and Chen, Joshua},
-  journal={tba},
-  year={2025},
-  doi={tba},
-  url={tba},
+  journal = {Journal of Open Source Software},
+  publisher = {The Open Journal},
+  doi = {10.21105/joss.08505},
+  url = {https://doi.org/10.21105/joss.08505},
+  volume = {10},
+  number = {112},
+  pages = {8505},
+  year = {2025}
 }
 ```
