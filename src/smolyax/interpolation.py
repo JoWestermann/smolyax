@@ -58,6 +58,7 @@ class SmolyakBarycentricInterpolator:
         f: Callable[[Union[jax.Array, np.ndarray]], Union[jax.Array, np.ndarray]] = None,
         n_inputs: int = None,
         memory_limit: float = 4.0,
+        quadrature: bool = False,
     ) -> None:
         r"""
         Initialize the Smolyak Barycentric Interpolator.
@@ -82,7 +83,11 @@ class SmolyakBarycentricInterpolator:
         memory_limit : float, optional
             Maximum memory in gigabytes to use during batched evaluation. Controls the batch size
             to stay within this memory limit. Default is 4.0.
+        quadrature : bool, optional
+            Whether to use index set optimized for quadrature. Default is False.
         """
+        self.__quadrature: bool = quadrature
+
         self.__d_in = len(k)
         self.__d_out = d_out
 
@@ -100,7 +105,7 @@ class SmolyakBarycentricInterpolator:
         self.__n_2_sorted_degs = {}
         self.__n_2_zetas = {}
 
-        self.__n_f_evals = indices.nodeset_cardinality(k, t, nested=self.__is_nested)
+        self.__n_f_evals = indices.nodeset_cardinality(k, t, nested=self.__is_nested, quadrature=self.__quadrature)
         self.__n_f_evals_new = 0
 
         self.__compiled_tensor_product_evaluation = None
@@ -142,7 +147,7 @@ class SmolyakBarycentricInterpolator:
         zero = np.array([g(0)[0] for g in self.__node_gen])
 
         # get multi-indices and smolyak coefficients (only non-zero), binned by the number of active dimensions n
-        n_2_nus, self.__n_2_zetas = indices.non_zero_indices_and_zetas(self.__k, self.__t)
+        n_2_nus, self.__n_2_zetas = indices.non_zero_indices_and_zetas(self.__k, self.__t, quadrature=self.__quadrature)
 
         for n, nus in n_2_nus.items():
 
